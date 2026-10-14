@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Culcat Corner</title>
+  <style>
+    body { background: #111; color: #ddd; font-family: monospace; margin: 0; padding: 1rem; }
+    #output { height: 70vh; overflow-y: auto; border: 1px solid #333; padding: 0.5rem; }
+    #input { width: 100%; box-sizing: border-box; margin-top: 0.5rem; padding: 0.5rem;
+             background: #000; color: #0f0; border: 1px solid #333; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h1>Culcat Corner</h1>
+  <div id="output">Welcome, traveler. Type something below.</div>
+  <input id="input" placeholder="Type a command and press Enter" autofocus>
+  <script>
+    const out = document.getElementById("output");
+    const input = document.getElementById("input");
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || !input.value.trim()) return;
+      out.innerHTML += "<br>&gt; " + input.value.replace(/</g, "&lt;");
+      out.innerHTML += "<br>(The world doesn't respond yet.)";
+      out.scrollTop = out.scrollHeight;
+      input.value = "";
+    });
+  </script>
+</body>
+</html>
