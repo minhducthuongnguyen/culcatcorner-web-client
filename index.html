@@ -1,33 +1,60 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Little Wizard School</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Little Wizard School</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#dfe6f2;--fg:#1b2030;--bar:#c9d2e6;--ac:#6a4cff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141f;--fg:#e8ecf7;--bar:#1c2033}}
-:root[data-theme="dark"]{--bg:#12141f;--fg:#e8ecf7;--bar:#1c2033}
-html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+:root{--bg:#dfe6f2;--fg:#1b2030;--bar:#c9d2e6;--ac:#6a4cff}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141f;--fg:#e8ecf7;--bar:#1c2033;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12141f;--fg:#e8ecf7;--bar:#1c2033;color-scheme:dark}
+html{height:100%}
 body{margin:0;height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:9px 'Press Start 2P',ui-monospace,Menlo,Consolas,monospace}
-#bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:6px 10px;background:var(--bar)}
+#bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:6px max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px));background:var(--bar)}
 button{font:inherit;background:var(--ac);color:#fff;border:0;padding:6px 8px;cursor:pointer}
 #meter{position:relative;width:150px;height:12px;background:#0006;border:2px solid var(--fg)}
 #lv{display:block;height:100%;width:0;background:linear-gradient(90deg,#4c4,#fd3 70%,#e43)}
 #meter b{position:absolute;top:-3px;width:2px;height:18px}#mk{background:#f33}#wk{background:#fc0}
 input{vertical-align:middle}
-#wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
-canvas{image-rendering:pixelated;width:min(100vw,calc((100vh - 60px)*1.6));aspect-ratio:8/5;background:#5aa14a;max-height:100%}
+#wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+#stage{position:relative;width:min(100%,calc((100vh - 60px)*1.6));aspect-ratio:8/5;max-height:100%}
+#c{display:block;width:100%;height:100%;image-rendering:pixelated;background:#5aa14a}
+#nm{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #bn{position:absolute;top:4%;left:50%;transform:translateX(-50%);max-width:90%;text-align:center;line-height:1.6;padding:10px 14px;border:3px solid #fff;font-size:clamp(8px,2vw,20px);display:none;color:#fff}
 #bn.warn{display:block;background:#c98a00;animation:p .5s infinite alternate}
 #bn.flee{display:block;background:#b01818;animation:p .25s infinite alternate}
 #bn.ok{display:block;background:#2a6fb0;font-size:clamp(7px,1.5vw,14px)}
 #bn.ev{display:block;background:#6a3fb5;font-size:clamp(7px,1.7vw,16px)}
 #bn small{font-size:.6em}@keyframes p{to{transform:translateX(-50%) scale(1.05)}}
-</style></head><body>
+
+[hidden]{display:none!important}
+#modal{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.65)}
+#modal .card{width:100%;max-width:760px;max-height:90vh;overflow:auto;padding:14px 16px;line-height:1.6;background:var(--bar);color:var(--fg);border:3px solid var(--fg)}
+#modal h2{font-size:13px;margin:0 0 4px}#modal h3{font-size:10px;margin:14px 0 6px}#modal p{font-size:8px;margin:0 0 6px;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.opt{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;padding:6px 8px;border:2px solid rgba(0,0,0,.25);cursor:pointer;font-size:8px}
+.opt small{flex-basis:100%;padding-left:22px;font-size:7px;opacity:.75}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button.alt{background:transparent;color:var(--fg);border:2px solid var(--fg)}
+</style>
+</head>
+<body>
 <div id="bar"><button id="mic">ENABLE MIC</button><div id="meter"><i id="lv"></i><b id="wk"></b><b id="mk"></b></div>
 <label>Limit <input id="sl" type="range" min="5" max="90" value="40"></label><span id="info"></span>
-<button id="tw">Test warn</button><button id="tl">Test loud</button></div>
-<div id="wrap"><canvas id="c"></canvas><div id="bn"></div></div>
+<button id="tw">Test warn</button><button id="tl">Test loud</button><button id="cfgBtn" class="alt">Settings</button></div>
+<div id="wrap"><div id="stage"><canvas id="c"></canvas><canvas id="nm"></canvas></div><div id="bn"></div></div>
+<div id="modal" hidden><div class="card" role="dialog" aria-label="Settings">
+<h2>Settings</h2><p>Choose which stories and holidays appear. Saved on this computer.</p>
+<h3>Book series (their characters visit and leave props around the school)</h3>
+<div class="row" style="margin:0 0 6px"><button id="cfgAll" class="alt">Select all</button><button id="cfgNone" class="alt">Clear</button></div>
+<div id="seriesList" class="grid"></div>
+<h3>School holidays (costumes, decorations, weather and special events)</h3>
+<div id="holList" class="grid"></div>
+<div class="row"><button id="cfgSave">Save</button><button id="cfgCancel" class="alt">Cancel</button></div>
+</div></div>
 <script>
+
 /*
  * LITTLE WIZARD SCHOOL - a quiet-class idle game
  * ---------------------------------------------
@@ -39,58 +66,58 @@ canvas{image-rendering:pixelated;width:min(100vw,calc((100vh - 60px)*1.6));aspec
  * world + pathfinding, scenery, Horrible Harry extras, drawing, main loop.
  */
 // ---- Canvas setup: the game is drawn at 320x200 and scaled up by CSS for the pixel look ----
-const W = 320;
-const H = 200;
-const $ = i => document.getElementById(i);
-const cv = $('c');
-cv.width = W;
-cv.height = H;
-let g = cv.getContext('2d');
-const bgc = document.createElement('canvas');
-bgc.width = W;
-bgc.height = H;
+const WIDTH = 320;
+const HEIGHT = 200;
+const byId = i => document.getElementById(i);
+const canvas = byId('c');
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
+let ctx = canvas.getContext('2d');
+const backgroundCanvas = document.createElement('canvas');
+backgroundCanvas.width = WIDTH;
+backgroundCanvas.height = HEIGHT;
 let ol = 0;
 // R = draw a filled rectangle. While 'ol' is on it draws a dark 1px-bigger rectangle instead,
 // which is how outlines work (see OL below).
-const R = (x, y, w, h, c) => {
+const drawRect = (x, y, w, h, c) => {
     if (ol) {
-        g.fillStyle = '#1b1228';
-        g.fillRect(Math.round(x) - 1, Math.round(y) - 1, w + 2, h + 2);
+        ctx.fillStyle = '#1b1228';
+        ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, w + 2, h + 2);
         return;
     }
-    g.fillStyle = c;
-    g.fillRect(Math.round(x), Math.round(y), w, h);
+    ctx.fillStyle = c;
+    ctx.fillRect(Math.round(x), Math.round(y), w, h);
 };
 // ob = draw a 1px outline around a rectangle
-const ob = (x, y, w, h, c = '#2a1a14') => {
-    R(x - 1, y - 1, w + 2, 1, c);
-    R(x - 1, y + h, w + 2, 1, c);
-    R(x - 1, y, 1, h, c);
-    R(x + w, y, 1, h, c);
+const drawRectOutline = (x, y, w, h, c = '#2a1a14') => {
+    drawRect(x - 1, y - 1, w + 2, 1, c);
+    drawRect(x - 1, y + h, w + 2, 1, c);
+    drawRect(x - 1, y, 1, h, c);
+    drawRect(x + w, y, 1, h, c);
 };
 // OL(fn) = run a drawing function twice: first as a dark silhouette, then in colour => outlined sprite
-const OL = f => {
+const drawOutlined = f => {
     ol = 1;
     f();
     ol = 0;
     f();
 };
-const rnd = (a, b) => a + Math.random() * (b - a);
-const pick = a => a[Math.random() * a.length | 0];
+const randomBetween = (a, b) => a + Math.random() * (b - a);
+const pickOne = a => a[Math.random() * a.length | 0];
 // E = draw a filled ellipse (used for shadows, ponds, canopies). Skipped during outline pass.
-function E(cx, cy, rx, ry, c) {
+function fillEllipse(cx, cy, rx, ry, c) {
     if (ol) {
         return;
     }
-    g.fillStyle = c;
+    ctx.fillStyle = c;
     for (let y = -ry; y <= ry; y++) {
         const w = Math.sqrt(1 - y * y / (ry * ry)) * rx;
-        g.fillRect(Math.round(cx - w), Math.round(cy + y), Math.round(w * 2), 1);
+        ctx.fillRect(Math.round(cx - w), Math.round(cy + y), Math.round(w * 2), 1);
     }
 }
 // ---- Tiny pixel emoji: each icon is 7x7 characters, letters map to the colours in PAL ----
-const PAL = { r: '#e33', y: '#fd3', b: '#39f', w: '#fff', k: '#222', p: '#f6a', g: '#3a3', o: '#e92', c: '#6ef', u: '#85f' };
-const IC = {
+const PIXEL_COLORS = { r: '#e33', y: '#fd3', b: '#39f', w: '#fff', k: '#222', p: '#f6a', g: '#3a3', o: '#e92', c: '#6ef', u: '#85f' };
+const EMOJI_ICONS = {
     heart: ['.......', '.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'],
     star: ['...y...', '...y...', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', '.y...y.'],
     note: ['..bbbbb', '..b...b', '..b...b', '..b...b', 'bbb.bbb', 'bbb.bbb', '.......'],
@@ -103,24 +130,24 @@ const IC = {
     flower: ['..ppp..', '.ppypp.', '..ppp..', '...g...', '..gg...', '...g...', '.......']
 };
 // Items characters carry: [colour, width, height, highlight colour]
-const IT = { can: ['#4aa3ff', 3, 2, '#bfe0ff'], book: ['#c33', 3, 3, '#fff'], wand: ['#8b5a2b', 1, 4, '#ffe066'], poster: ['#ff7ab8', 3, 3, '#fff'], mask: ['#fff', 3, 3, '#222'], bread: ['#e0b070', 2, 2, '#fff'] };
+const ITEM_SPRITES = { can: ['#4aa3ff', 3, 2, '#bfe0ff'], book: ['#c33', 3, 3, '#fff'], wand: ['#8b5a2b', 1, 4, '#ffe066'], poster: ['#ff7ab8', 3, 3, '#fff'], mask: ['#fff', 3, 3, '#222'], bread: ['#e0b070', 2, 2, '#fff'] };
 const item = (k, x, y) => {
-    const t = IT[k];
-    R(x, y, t[1], t[2], t[0]);
-    R(x + (t[1] > 2 ? 1 : 0), y, 1, 1, t[3]);
+    const t = ITEM_SPRITES[k];
+    drawRect(x, y, t[1], t[2], t[0]);
+    drawRect(x + (t[1] > 2 ? 1 : 0), y, 1, 1, t[3]);
 };
 // Draws a speech bubble with an emoji inside
 function bubble(x, y, n) {
-    R(x - 1, y - 1, 9, 9, '#222');
-    R(x, y, 7, 7, '#fff');
-    R(x + 2, y + 8, 3, 1, '#222');
-    R(x + 3, y + 9, 1, 1, '#222');
-    const a = IC[n];
+    drawRect(x - 1, y - 1, 9, 9, '#222');
+    drawRect(x, y, 7, 7, '#fff');
+    drawRect(x + 2, y + 8, 3, 1, '#222');
+    drawRect(x + 3, y + 9, 1, 1, '#222');
+    const a = EMOJI_ICONS[n];
     for (let j = 0; j < 7; j++) {
         for (let i = 0; i < 7; i++) {
             const ch = a[j][i];
             if (ch !== '.') {
-                R(x + i, y + j, 1, 1, PAL[ch]);
+                drawRect(x + i, y + j, 1, 1, PIXEL_COLORS[ch]);
             }
         }
     }
@@ -130,7 +157,7 @@ function bubble(x, y, n) {
 // Each activity has: w = how likely students pick it, it = item carried, em = emoji they may show,
 // d = [min,max] seconds, sit = students sit down, s = list of [x,y] spots (one student per spot),
 // o = who occupies each spot (filled in below)
-const A = {
+const ACTIVITIES = {
     garden: { w: 3, it: 'can', em: ['flower', 'smile', 'heart'], d: [14, 30], s: [[36, 135], [63, 135], [90, 135], [36, 159], [63, 159], [90, 159], [18, 131], [106, 150]] },
     class: { w: 2, it: 'book', em: ['book', 'question', 'star'], d: [16, 34], sit: 1, s: [[41, 57], [65, 57], [89, 57], [113, 57], [41, 75], [65, 75], [89, 75], [113, 75]] },
     lesson: { w: 2, it: 'book', em: ['book', 'smile', 'question'], d: [16, 34], sit: 1, s: [[150, 138], [165, 138], [180, 138], [195, 138], [150, 150], [165, 150], [180, 150], [195, 150]] },
@@ -141,40 +168,39 @@ const A = {
     read: { w: 2, it: 'book', em: ['book', 'smile', 'heart'], d: [14, 30], sit: 1, s: [[206, 121], [220, 121], [213, 128], [227, 128]] },
     ball: { w: 2, it: null, em: ['smile', 'star', 'note'], d: [12, 26], s: [[128, 181], [152, 186], [176, 181], [200, 186]] }
 };
-for (const k in A) {
-    A[k].o = A[k].s.map(() => null);
+for (const k in ACTIVITIES) {
+    ACTIVITIES[k].o = ACTIVITIES[k].s.map(() => null);
 }
 // Waypoints teachers patrol between, and the post each teacher stands at (null = roams)
-const WP = [[40, 100], [100, 160], [160, 98], [225, 100], [268, 100], [150, 176], [60, 100], [140, 66]];
-const HOME = [[75, 37], [172, 128], [205, 70], null];
-const TEM = [['book', 'excl', 'smile'], ['book', 'star', 'smile'], ['note', 'star', 'smile'], ['smile', 'flower', 'book']];
+const PATROL_POINTS = [[40, 100], [100, 160], [160, 98], [225, 100], [268, 100], [150, 176], [60, 100], [140, 66]];
+const TEACHER_POSTS = [[75, 37], [172, 128], [205, 70], null];
+const TEACHER_EMOJIS = [['book', 'excl', 'smile'], ['book', 'star', 'smile'], ['note', 'star', 'smile'], ['smile', 'flower', 'book']];
 // Colour palettes for randomly generated students
-const SK = ['#f6d2b0', '#e3a876', '#b9774a', '#7a4a2c'];
-const HR = ['#2b1b0e', '#6b3f1d', '#d9a441', '#c0392b', '#1a1a1a', '#e8e0d0', '#7b4bd1'];
-const HC = ['#c0392b', '#2e86de', '#27ae60', '#e1a400'];
-const HT = ['#33264f', '#4a2c6e', '#1f3b66', '#7a2a3a'];
+const SKIN_TONES = ['#f6d2b0', '#e3a876', '#b9774a', '#7a4a2c'];
+const HAIR_COLORS = ['#2b1b0e', '#6b3f1d', '#d9a441', '#c0392b', '#1a1a1a', '#e8e0d0', '#7b4bd1'];
+const ROBE_COLORS = ['#c0392b', '#2e86de', '#27ae60', '#e1a400'];
+const HAT_COLORS = ['#33264f', '#4a2c6e', '#1f3b66', '#7a2a3a'];
 // ---- CHARACTERS: 40 students (cs[0..39]) followed by 4 teachers (cs[40..43]) ----
-const cs = [];
+const people = [];
 for (let i = 0; i < 44; i++) {
     const tc = i >= 40;
-    const hm = tc ? HOME[i - 40] : null;
-    cs.push({ id: i, tc, tn: i - 40, hm, x: hm ? hm[0] : rnd(20, 300), y: hm ? hm[1] : rnd(93, 102), tx: 0, ty: 0, s: tc ? 'act' : 'idle', w: rnd(0, 3), ph: rnd(0, 6), sk: pick(SK), hr: pick(HR), hc: pick(HT), rb: tc ? ['#6a3fb5', '#1f7a8c', '#8c2f5e', '#a35a1f'][i - 40] : pick(HC), ht: Math.random() < .5, em: null, item: null, act: null, sp: 0, last: null, then: 'idle', ex: 0, ey: 0, ret: 0, frz: 0, ec: rnd(1, 3), via: null, jx: 0 });
+    const hm = tc ? TEACHER_POSTS[i - 40] : null;
+    people.push({ id: i, tc, tn: i - 40, hm, x: hm ? hm[0] : randomBetween(20, 300), y: hm ? hm[1] : randomBetween(93, 99), tx: 0, ty: 0, s: tc ? 'act' : 'idle', w: randomBetween(0, 3), ph: randomBetween(0, 6), sk: pickOne(SKIN_TONES), hr: pickOne(HAIR_COLORS), hc: pickOne(HAT_COLORS), rb: tc ? ['#6a3fb5', '#1f7a8c', '#8c2f5e', '#a35a1f'][i - 40] : pickOne(ROBE_COLORS), ht: Math.random() < .5, em: null, item: null, act: null, sp: 0, last: null, then: 'idle', ex: 0, ey: 0, ret: 0, frz: 0, ec: randomBetween(1, 3), jx: 0 });
 }
 /* Special characters from the Horrible Harry books (names are drawn under their feet) */
-Object.assign(cs[0], { name: 'Harry', hr: '#111', ht: false, rb: '#1a1a24' });
-Object.assign(cs[1], { name: 'Doug', hr: '#6b3f1d', ht: false, rb: '#2e86de', gl: true });
-Object.assign(cs[2], { name: 'Song Lee', hr: '#111', ht: false, rb: '#ff7ab8' });
-cs[40].name = 'Miss Mackle';
+Object.assign(people[0], { name: 'Harry', hr: '#111', ht: false, rb: '#1a1a24' });
+Object.assign(people[1], { name: 'Doug', hr: '#6b3f1d', ht: false, rb: '#2e86de', gl: true });
+Object.assign(people[2], { name: 'Song Lee', hr: '#111', ht: false, rb: '#ff7ab8' });
+people[40].name = 'Miss Mackle';
 // Show an emoji bubble above a character for t seconds
-const setEm = (c, i, t = 1.8) => {
+const showEmoji = (c, i, t = 1.8) => {
     c.em = { i, t, m: t };
 };
-const inside = (x, y) => x > 20 && x < 130 && y < 84;
 // Send a character to (x,y). A route around walls is found first (see findPath), then 'then' says what to do on arrival
-function setT(c, x, y, then) {
+function sendTo(c, x, y, then) {
     // If the requested spot is inside a wall/object, move the target to the nearest walkable cell
-    if (BK[Math.floor(y / 4) * GW + Math.floor(x / 4)]) {
-        const [ci, cj] = cOf(x, y);
+    if (blocked[Math.floor(y / 4) * GRID_W + Math.floor(x / 4)]) {
+        const [ci, cj] = cellOf(x, y);
         x = ci * 4 + 2;
         y = cj * 4 + 2;
     }
@@ -185,7 +211,7 @@ function setT(c, x, y, then) {
     c.path = findPath(c.x, c.y, x, y);
 }
 // Move one step along the planned route. Returns true when the final target is reached
-function mv(c, dt, sp) {
+function stepToward(c, dt, sp) {
     const p = c.path && c.path[0];
     let tx = p ? p[0] : c.tx;
     let ty = p ? p[1] : c.ty;
@@ -208,116 +234,119 @@ function mv(c, dt, sp) {
     return false;
 }
 // Free the activity spot a character is using
-const rel = c => {
+const releaseSpot = c => {
     if (c.act) {
-        A[c.act].o[c.sp] = null;
+        ACTIVITIES[c.act].o[c.sp] = null;
         c.act = null;
     }
 };
 // D = items dropped on the ground, P = small particles (sparkles, water drops, petals...)
-const D = [];
-const P = [];
-const sp = (x, y, c, vy = -10, t = .8, gr = 0) => P.push({ x, y, vx: rnd(-6, 6), vy, t, m: t, c, g: gr });
+const droppedItems = [];
+const particles = [];
+const spawnParticle = (x, y, c, vy = -10, t = .8, gr = 0, s = 1) => particles.push({ x, y, vx: randomBetween(-6, 6), vy, t, m: t, c, g: gr, s });
 // Drop whatever the character is holding onto the ground
-function drop(c) {
+function dropHeldItem(c) {
     if (c.item) {
-        D.push({ x: c.x + rnd(-3, 3), y: c.y, it: c.item, t: 9 });
+        droppedItems.push({ x: c.x + randomBetween(-3, 3), y: c.y, it: c.item, t: 9 });
         c.item = null;
     }
 }
 // A free student picks what to do next: pick up a dropped item, stroll, or join a weighted-random activity with a free spot
-function choose(c) {
-    if (D.length && Math.random() < .4) {
-        const d = D[0];
+function chooseNextActivity(c) {
+    if (droppedItems.length && Math.random() < .4) {
+        const d = droppedItems[0];
         c.pk = d;
-        setT(c, d.x, d.y, 'pick');
+        sendTo(c, d.x, d.y, 'pick');
         return;
     }
     if (Math.random() < .2) {
-        setT(c, rnd(20, 300), rnd(92, 102), 'idle');
-        c.w = rnd(2, 5);
+        sendTo(c, randomBetween(20, 300), randomBetween(92, 102), 'idle');
+        c.w = randomBetween(2, 5);
         return;
     }
-    let ks = Object.keys(A).filter(k => A[k].o.includes(null));
+    let ks = Object.keys(ACTIVITIES).filter(k => ACTIVITIES[k].o.includes(null));
     if (ks.length > 1) {
         ks = ks.filter(k => k !== c.last);
     }
     let tot = 0;
-    ks.forEach(k => tot += A[k].w);
+    ks.forEach(k => tot += ACTIVITIES[k].w);
     let r = Math.random() * tot;
     let k = ks[0];
     for (const q of ks) {
-        r -= A[q].w;
+        r -= ACTIVITIES[q].w;
         if (r <= 0) {
             k = q;
             break;
         }
     }
     const fr = [];
-    A[k].o.forEach((o, i) => {
+    ACTIVITIES[k].o.forEach((o, i) => {
         if (!o) {
             fr.push(i);
         }
     });
-    const i = pick(fr);
-    A[k].o[i] = c;
+    const i = pickOne(fr);
+    ACTIVITIES[k].o[i] = c;
     c.act = k;
     c.sp = i;
     c.last = k;
-    c.item = A[k].it;
+    c.item = ACTIVITIES[k].it;
     if (k === 'garden' && Math.random() < .6) {
-        setT(c, 108, 138, 'fill');
+        sendTo(c, 108, 138, 'fill');
     }
     else {
-        setT(c, A[k].s[i][0], A[k].s[i][1], 'act');
+        sendTo(c, ACTIVITIES[k].s[i][0], ACTIVITIES[k].s[i][1], 'act');
     }
 }
 // Called when a character finishes walking: decide what state they enter next
-function arrive(c) {
+function onArrive(c) {
     if (c.then === 'fill') {
         for (let i = 0; i < 6; i++) {
-            sp(c.x + 3, c.y - 5, '#4aa3ff', -12, .5, 30);
+            spawnParticle(c.x + 3, c.y - 5, '#4aa3ff', -12, .5, 30);
         }
-        const s = A[c.act].s[c.sp];
-        setT(c, s[0], s[1], 'act');
+        const s = ACTIVITIES[c.act].s[c.sp];
+        sendTo(c, s[0], s[1], 'act');
     }
     else if (c.then === 'act' && !c.tc) {
         c.s = 'act';
-        c.w = rnd(...A[c.act].d);
-        c.ec = rnd(6, 14);
+        c.w = randomBetween(...ACTIVITIES[c.act].d);
+        c.ec = randomBetween(6, 14);
     }
     else if (c.then === 'post') {
         c.s = 'act';
-        c.w = rnd(8, 16);
-        c.ec = rnd(6, 14);
+        c.w = randomBetween(8, 16);
+        c.ec = randomBetween(6, 14);
+    }
+    else if (c.then === 'stop') {
+        beginVisitStop(c);
     }
     else if (c.then === 'watch') {
         c.s = 'watch';
-        c.w = ev ? Math.max(1, ev.d - ev.t) : 2;
+        c.w = currentEvent ? Math.max(1, currentEvent.d - currentEvent.t) : 2;
     }
     else if (c.then === 'pick') {
-        const k = D.indexOf(c.pk);
+        const k = droppedItems.indexOf(c.pk);
         if (k >= 0) {
-            D.splice(k, 1);
+            droppedItems.splice(k, 1);
         }
         c.pk = null;
         c.s = 'idle';
         c.w = 1;
     }
     else if (c.then === 'prank') {
-        setEm(c, 'smile', 1.6);
+        showEmoji(c, 'smile', 1.6);
         if (c.pv) {
-            setEm(c.pv, 'excl', 1.4);
+            showEmoji(c.pv, 'excl', 1.4);
         }
         c.pv = null;
         c.s = 'idle';
-        c.w = rnd(2, 4);
-        const d = cs[1];
+        c.w = randomBetween(2, 4);
+        const d = people[1];
         if (d.s === 'idle' || d.s === 'act') {
-            rel(d);
+            releaseSpot(d);
             d.item = null;
-            setT(d, c.x - 6, c.y + 1, 'idle');
-            d.w = rnd(2, 4);
+            sendTo(d, c.x - 6, c.y + 1, 'idle');
+            d.w = randomBetween(2, 4);
         }
     }
     else {
@@ -327,7 +356,10 @@ function arrive(c) {
 // Per-frame update for one character. States:
 //  idle (waiting) | go (walking) | act (doing an activity) | watch (watching an event)
 //  freeze (scared) | flee (running off screen) | away (off screen, waiting to come back)
-function updC(c, dt) {
+function updateCharacter(c, dt) {
+    if (c.guest && updateVisitor(c, dt)) {
+        return;
+    }
     if (c.em) {
         c.em.t -= dt;
         if (c.em.t <= 0) {
@@ -335,33 +367,32 @@ function updC(c, dt) {
         }
     }
     if (c.s === 'away') {
-        if (mode === 'calm' && T >= c.ret) {
+        if (noiseMode === 'calm' && clock >= c.ret) {
             c.s = 'go';
             c.x = c.ex;
             c.y = c.ey;
-            setT(c, rnd(148, 172), rnd(95, 101), 'idle');
-            c.via = null;
-            c.w = rnd(.5, 2);
+            sendTo(c, randomBetween(148, 172), randomBetween(95, 101), 'idle');
+            c.w = randomBetween(.5, 2);
         }
         return;
     }
     if (c.s === 'flee') {
-        if (mv(c, dt, 52)) {
+        if (stepToward(c, dt, c.guest && noiseMode !== 'flee' ? 22 : 52)) {
             c.s = 'away';
             c.ret = 1e9;
             c.em = null;
         }
         else if (Math.random() < dt * .6) {
-            setEm(c, pick(['excl', 'sweat']), 1);
+            showEmoji(c, pickOne(['excl', 'sweat']), 1);
         }
         return;
     }
     if (c.s === 'freeze') {
-        c.jx = Math.sin(T * 55 + c.id * 3) * .7;
+        c.jx = Math.sin(clock * 55 + c.id * 3) * .7;
         c.ec -= dt;
         if (c.ec <= 0) {
-            c.ec = rnd(1.8, 3);
-            setEm(c, pick(['excl', 'question', 'sweat']), 1.2);
+            c.ec = randomBetween(1.8, 3);
+            showEmoji(c, pickOne(['excl', 'question', 'sweat']), 1.2);
         }
         return;
     }
@@ -369,13 +400,13 @@ function updC(c, dt) {
         c.w -= dt;
         if (c.w <= 0) {
             c.s = 'idle';
-            c.w = rnd(1, 3);
+            c.w = randomBetween(1, 3);
         }
         return;
     }
     if (c.s === 'go') {
-        if (mv(c, dt, c.tc ? 14 : 17)) {
-            arrive(c);
+        if (stepToward(c, dt, c.tc ? 14 : 17)) {
+            onArrive(c);
         }
         return;
     }
@@ -383,11 +414,11 @@ function updC(c, dt) {
         c.w -= dt;
         if (c.w <= 0) {
             if (c.tc) {
-                const h = c.hm || pick(WP);
-                setT(c, h[0], h[1], 'post');
+                const h = c.hm || pickOne(PATROL_POINTS);
+                sendTo(c, h[0], h[1], 'post');
             }
             else {
-                choose(c);
+                chooseNextActivity(c);
             }
         }
         return;
@@ -396,14 +427,14 @@ function updC(c, dt) {
         c.w -= dt;
         c.ec -= dt;
         if (c.ec <= 0) {
-            c.ec = rnd(10, 22);
-            setEm(c, c.tc ? pick(TEM[c.tn]) : pick(A[c.act].em));
+            c.ec = randomBetween(10, 22);
+            showEmoji(c, c.tc ? pickOne(TEACHER_EMOJIS[c.tn]) : pickOne(ACTIVITIES[c.act].em));
         }
         if (c.tc) {
             if (c.w <= 0) {
-                const p = pick(WP);
-                setT(c, p[0], p[1], 'idle');
-                c.w = rnd(3, 6);
+                const p = pickOne(PATROL_POINTS);
+                sendTo(c, p[0], p[1], 'idle');
+                c.w = randomBetween(3, 6);
             }
             return;
         }
@@ -413,281 +444,750 @@ function updC(c, dt) {
         if (k === 'garden') {
             plants[c.sp % 6].g = Math.min(1, plants[c.sp % 6].g + dt * .06);
             if (Math.random() < dt * 5) {
-                sp(x + 4, y - 3, '#4aa3ff', 14, .5, 40);
+                spawnParticle(x + 4, y - 3, '#4aa3ff', 14, .5, 40);
             }
         }
         else if (k === 'magic') {
-            mg++;
+            casterCount++;
             if (Math.random() < dt * 6) {
-                sp(x, y - 8, pick(['#b68cff', '#6ef', '#fff']), rnd(-18, -8), .9);
+                spawnParticle(x, y - 8, pickOne(['#b68cff', '#6ef', '#fff']), randomBetween(-18, -8), .9);
             }
         }
         else if (k === 'deco') {
-            deco += dt * .12;
+            decorationProgress += dt * .12;
             if (Math.random() < dt * 3) {
-                sp(x + 3, y - 5, '#ffe066', -6, .4);
+                spawnParticle(x + 3, y - 5, '#ffe066', -6, .4);
             }
         }
         else if (k === 'pond') {
             if (Math.random() < dt * 3) {
-                sp(x + rnd(-4, 4), y, '#e0b070', 8, .6, 30);
+                spawnParticle(x + randomBetween(-4, 4), y, '#e0b070', 8, .6, 30);
             }
         }
         if (c.w <= 0) {
-            rel(c);
+            releaseSpot(c);
             c.item = null;
             c.s = 'idle';
-            c.w = rnd(1, 3);
+            c.w = randomBetween(1, 3);
         }
     }
 }
 // ---- NOISE + MODES ('calm' | 'warn' | 'flee') ----
 // lvl = smoothed noise level 0-100, T = game clock in seconds, quietT = seconds since last noise
-let mode = 'calm';
-let T = 0;
-let lvl = 0;
-let calmT = 0;
-let quietT = 0;
-let evT = 0;
-let nextEv = 18;
-let ev = null;
-let an;
-let buf;
-let micOn = false;
-let mg = 0;
-let deco = 2;
-let sim = { s: 0, w: 0, tl: 0, tw: 0 };
-const sl = $('sl');
+let noiseMode = 'calm';
+let clock = 0;
+let noiseLevel = 0;
+let calmTime = 0;
+let quietTime = 0;
+let eventTimer = 0;
+let nextEventAt = 12;
+let currentEvent = null;
+let analyser;
+let audioBuffer;
+let micEnabled = false;
+let casterCount = 0;
+let decorationProgress = 2;
+let simulatedNoise = { s: 0, w: 0, tl: 0, tw: 0 };
+const limitSlider = byId('sl');
 // Current loudness 0-100: microphone volume, or the test keys / buttons
-function raw() {
+function readNoiseLevel() {
     let v = 0;
-    if (micOn) {
-        an.getFloatTimeDomainData(buf);
+    if (micEnabled) {
+        analyser.getFloatTimeDomainData(audioBuffer);
         let s = 0;
-        for (const x of buf) {
+        for (const x of audioBuffer) {
             s += x * x;
         }
-        v = Math.min(100, Math.sqrt(s / buf.length) * 350);
+        v = Math.min(100, Math.sqrt(s / audioBuffer.length) * 350);
     }
-    const th = +sl.value;
-    return Math.max(v, sim.s || sim.tl ? 100 : 0, sim.w || sim.tw ? th * .82 : 0);
+    const th = +limitSlider.value;
+    return Math.max(v, simulatedNoise.s || simulatedNoise.tl ? 100 : 0, simulatedNoise.w || simulatedNoise.tw ? th * .82 : 0);
 }
-$('mic').onclick = async () => {
+byId('mic').onclick = async () => {
     try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         const ac = new (window.AudioContext || window.webkitAudioContext)();
         ac.resume();
-        an = ac.createAnalyser();
-        an.fftSize = 1024;
-        ac.createMediaStreamSource(s).connect(an);
-        buf = new Float32Array(an.fftSize);
-        micOn = true;
-        $('mic').textContent = 'MIC ON';
+        analyser = ac.createAnalyser();
+        analyser.fftSize = 1024;
+        ac.createMediaStreamSource(s).connect(analyser);
+        audioBuffer = new Float32Array(analyser.fftSize);
+        micEnabled = true;
+        byId('mic').textContent = 'MIC ON';
     }
     catch (e) {
-        $('mic').textContent = 'NO MIC: USE TEST KEYS';
+        byId('mic').textContent = 'NO MIC: USE TEST KEYS';
     }
 };
 addEventListener('keydown', e => {
+    if (!byId('modal').hidden) {
+        return;
+    }
     if (e.code === 'Space') {
-        sim.s = 1;
+        simulatedNoise.s = 1;
         e.preventDefault();
     }
     if (e.key === 'w') {
-        sim.w = 1;
+        simulatedNoise.w = 1;
     }
-    if (e.key === 'e' && mode === 'calm' && !ev) {
-        startEv(pick(Object.keys(EVT)));
+    if (e.key === 'e' && noiseMode === 'calm' && !currentEvent) {
+        startEvent(chooseSpecialEvent());
     }
 });
 addEventListener('keyup', e => {
     if (e.code === 'Space') {
-        sim.s = 0;
+        simulatedNoise.s = 0;
     }
     if (e.key === 'w') {
-        sim.w = 0;
+        simulatedNoise.w = 0;
     }
 });
 [['tw', 'tw'], ['tl', 'tl']].forEach(([i, k]) => {
-    const b = $(i);
-    b.onpointerdown = () => sim[k] = 1;
-    b.onpointerup = b.onpointerleave = () => sim[k] = 0;
+    const b = byId(i);
+    b.onpointerdown = () => simulatedNoise[k] = 1;
+    b.onpointerup = b.onpointerleave = () => simulatedNoise[k] = 0;
 });
 // Level is close to the limit: everyone freezes, drops items and looks scared
 function onWarn() {
-    ev = null;
-    cs.forEach(c => {
+    currentEvent = null;
+    people.forEach(c => {
         if (c.s === 'away' || c.s === 'flee') {
             return;
         }
-        drop(c);
-        rel(c);
+        dropHeldItem(c);
+        releaseSpot(c);
         c.s = 'freeze';
         c.path = null;
-        setEm(c, 'excl', 1.2);
-        c.ec = rnd(.5, 1.2);
+        showEmoji(c, 'excl', 1.2);
+        c.ec = randomBetween(.5, 1.2);
     });
 }
 // Warning is over: frozen characters shake it off and carry on
 function onCalm() {
-    cs.forEach(c => {
+    people.forEach(c => {
         if (c.s === 'freeze') {
             c.s = 'idle';
             c.jx = 0;
-            c.w = rnd(1, 4);
+            c.w = randomBetween(1, 4);
         }
     });
 }
 // Level is above the limit: everyone runs to the nearest screen edge by the quickest walkable route
 function onFlee() {
-    ev = null;
-    cs.forEach(c => {
+    currentEvent = null;
+    people.forEach(c => {
         if (c.s === 'away' || c.s === 'flee') {
             return;
         }
-        drop(c);
-        rel(c);
+        dropHeldItem(c);
+        releaseSpot(c);
         c.jx = 0;
-        c.via = null;
+        c.hid = false;
         c.s = 'flee';
-        const pp = fleePath(c.x, c.y);
+        const pp = routeToNearestEdge(c.x, c.y);
         const L = pp.length ? pp[pp.length - 1] : [c.x, c.y];
         c.path = pp;
-        c.tx = L[0] < 4 ? -14 : L[0] > W - 4 ? W + 14 : L[0];
-        c.ty = L[1] < 4 ? -16 : L[1] > H - 4 ? H + 16 : L[1];
+        c.tx = L[0] < 4 ? -14 : L[0] > WIDTH - 4 ? WIDTH + 14 : L[0];
+        c.ty = L[1] < 4 ? -16 : L[1] > HEIGHT - 4 ? HEIGHT + 16 : L[1];
         c.ex = c.tx;
         c.ey = c.ty;
         c.then = 'away';
     });
 }
 // After the noise stops: give each absent character a return time within ~1 minute, arriving alone or in groups of up to 4
-function sched() {
-    const a = cs.filter(c => c.s === 'away' || c.s === 'flee').sort(() => Math.random() - .5);
+function scheduleReturns() {
+    const a = people.filter(c => c.s === 'away' || c.s === 'flee').sort(() => Math.random() - .5);
     let i = 0;
     while (i < a.length) {
-        const gr = a.slice(i, i + pick([1, 1, 2, 3, 4]));
+        const gr = a.slice(i, i + pickOne([1, 1, 2, 3, 4]));
         i += gr.length;
-        const t = T + rnd(3, 56);
+        const t = clock + randomBetween(3, 56);
         gr.forEach(c => {
-            c.ret = t + rnd(0, 1.5);
-            c.ex = gr[0].ex + rnd(-6, 6);
-            c.ey = gr[0].ey + rnd(-6, 6);
+            c.ret = t + randomBetween(0, 1.5);
+            c.ex = gr[0].ex + randomBetween(-6, 6);
+            c.ey = gr[0].ey + randomBetween(-6, 6);
         });
     }
 }
 /* ---------- events ---------- */
 // ---- SPECIAL EVENTS ----
 // EVT = [banner text, duration in seconds]; EEM = emojis the students show during the event
-const EVT = { rainbow: ['A rainbow appears over the school!', 14], fireworks: ['Magic fireworks!', 14], dragon: ['A friendly dragon flies over!', 11], owl: ['The owl post has arrived!', 13], bloom: ['The garden blooms with magic!', 14], ants: ['Ant Invasion! Follow the ants!', 14], slime: ['The Green Slime is loose!', 14], mud: ['Mud Gremlins in the garden!', 14], wedding: ['A kickball wedding!', 18], ghost: ['A friendly Halloween ghost!', 13] };
-const EEM = { rainbow: ['heart', 'star', 'smile'], fireworks: ['star', 'excl', 'smile'], dragon: ['excl', 'question'], owl: ['star', 'question'], bloom: ['flower', 'heart', 'sparkle'], ants: ['excl', 'question'], slime: ['question', 'excl', 'smile'], mud: ['excl', 'smile'], wedding: ['heart', 'star', 'smile'], ghost: ['excl', 'sweat', 'smile'] };
+const EVENT_INFO = { rainbow: ['A rainbow appears over the school!', 14], fireworks: ['Magic fireworks!', 14], dragon: ['A friendly dragon flies over!', 11], owl: ['The owl post has arrived!', 13], bloom: ['The garden blooms with magic!', 14], ants: ['Ant Invasion! Follow the ants!', 14], slime: ['The Green Slime is loose!', 14], mud: ['Mud Gremlins in the garden!', 14], wedding: ['A kickball wedding!', 18], ghost: ['A friendly Halloween ghost!', 13] };
+const EVENT_EMOJIS = { rainbow: ['heart', 'star', 'smile'], fireworks: ['star', 'excl', 'smile'], dragon: ['excl', 'question'], owl: ['star', 'question'], bloom: ['flower', 'heart', 'sparkle'], ants: ['excl', 'question'], slime: ['question', 'excl', 'smile'], mud: ['excl', 'smile'], wedding: ['heart', 'star', 'smile'], ghost: ['excl', 'sweat', 'smile'] };
 // Start a special event. (Events only start after a long enough quiet stretch)
-function startEv(k) {
-    ev = { k, t: 0, d: EVT[k][1], txt: EVT[k][0], fx: 0, tg: null };
+function startEvent(k) {
+    currentEvent = { k, t: 0, d: EVENT_INFO[k][1], txt: EVENT_INFO[k][0], fx: 0, tg: null };
     if (k === 'owl') {
-        ev.tg = pick(cs.filter(c => !c.tc && c.s !== 'away' && c.s !== 'flee'));
+        currentEvent.tg = pickOne(people.filter(c => !c.tc && c.s !== 'away' && c.s !== 'flee'));
     }
     if (k === 'wedding') {
         setupWedding();
     }
+    if (EXTRA_EVENTS[k] && EXTRA_EVENTS[k].start) {
+        EXTRA_EVENTS[k].start(currentEvent);
+    }
 }
 // A firework burst of particles
-function burst(x, y, c) {
+function fireworkBurst(x, y, c) {
     for (let i = 0; i < 28; i++) {
         const a = i / 28 * 6.283;
-        const s = rnd(20, 40);
-        P.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 1.4, m: 1.4, c, g: 40 });
+        const s = randomBetween(20, 40);
+        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 1.4, m: 1.4, c, g: 40 });
     }
 }
 // Per-frame event logic (spawning particles, emojis, growth...). The event pictures are drawn in over() and drawNewEvents()
-function evUp(dt) {
-    const e = ev;
+function updateEvent(dt) {
+    const e = currentEvent;
+    if (EXTRA_EVENTS[e.k] && EXTRA_EVENTS[e.k].update) {
+        EXTRA_EVENTS[e.k].update(e, dt);
+    }
     e.t += dt;
     e.fx -= dt;
     if (e.fx <= 0) {
         e.fx = e.k === 'fireworks' ? 1 : 2;
         if (e.k === 'fireworks') {
-            burst(rnd(40, 280), rnd(20, 75), pick(['#ff5a5a', '#ffd84a', '#6ef', '#c58cff', '#8f8']));
+            fireworkBurst(randomBetween(40, 280), randomBetween(20, 75), pickOne(['#ff5a5a', '#ffd84a', '#6ef', '#c58cff', '#8f8']));
         }
         for (let i = 0; i < 2; i++) {
-            const c = pick(cs);
+            const c = pickOne(people);
             if (c.s !== 'away' && c.s !== 'flee' && !c.em) {
-                setEm(c, pick(EEM[e.k]), 1.6);
+                showEmoji(c, pickOne(EVENT_EMOJIS[e.k]), 1.6);
             }
         }
     }
     if (e.k === 'wedding' && Math.random() < .2) {
-        sp(rnd(148, 182), 150, pick(['#ffb0d0', '#fff', '#ffe066']), 10, 2.5);
+        spawnParticle(randomBetween(148, 182), 150, pickOne(['#ffb0d0', '#fff', '#ffe066']), 10, 2.5);
     }
     if (e.k === 'bloom') {
         plants.forEach(p => p.g = Math.min(1, p.g + dt * .3));
         if (Math.random() < .5) {
-            sp(rnd(15, 110), rnd(105, 170), pick(['#fff', '#ffe066', '#ff9ad5']), -14, 1);
+            spawnParticle(randomBetween(15, 110), randomBetween(105, 170), pickOne(['#fff', '#ffe066', '#ff9ad5']), -14, 1);
         }
     }
     if (e.t >= e.d) {
-        ev = null;
-        nextEv = rnd(30, 50);
-        evT = 0;
+        currentEvent = null;
+        nextEventAt = randomBetween(18, 34);
+        eventTimer = 0;
     }
 }
 /* ---------- world objects ---------- */
 // ---- WORLD OBJECTS: garden plants (growth 0-1), pond fish and ducks, the kickball, tree positions ----
-const plants = [...Array(6)].map(() => ({ g: rnd(.2, .8) }));
+const plants = [...Array(6)].map(() => ({ g: randomBetween(.2, .8) }));
 const fish = [...Array(4)].map((_, i) => ({ a: i * 1.6 }));
 const ducks = [{ x: 255, y: 138, tx: 255, ty: 138 }, { x: 275, y: 145, tx: 275, ty: 145 }];
-const bl = { a: [165, 184], b: [165, 184], t: 0 };
-const TR = [[10, 102], [134, 170], [212, 108], [306, 94], [312, 180], [8, 190], [108, 196]];
+const kickball = { a: [165, 184], b: [165, 184], t: 0 };
+const TREES = [[10, 102], [134, 170], [212, 108], [306, 94], [312, 180], [8, 190], [108, 196]];
+/* =====================================================================
+ * BOOK SERIES, HOLIDAYS AND THE SETTINGS WINDOW
+ * Everything the teacher can switch on/off lives in this section.
+ * ===================================================================== */
+
+// ---- What is switched on (saved in the browser so it survives a reload) ----
+const settings = { series: ['mth', 'hh', 'pete', 'arthur', 'junie', 'frog', 'eleph', 'dogman'], holidays: [] };
+const SETTINGS_KEY = 'wizardSchoolSettings';
+
+// ---- Book series. 'place' = [x, y, action] where visitors of that series like to hang out.
+// Characters are either kids ('kid' = look overrides) or animals ('an' = animal type, 'ac' = colour).
+const BOOK_SERIES = [
+  { id: 'mth', name: 'Magic Tree House', emo: ['book', 'star', 'sparkle'], col: '#ffe066', place: [300, 102, 'climb'],
+    chars: [{ n: 'Jack', kid: { hr: '#6b3f1d', rb: '#c0392b' } },
+            { n: 'Annie', kid: { hr: '#e1a400', rb: '#e85d9f' } },
+            { n: 'Morgan le Fay', kid: { hr: '#e8e0d0', rb: '#7a3fb5', ht: true, hc: '#4a2c6e' } }] },
+  { id: 'hh', name: 'Horrible Harry', emo: ['smile', 'excl', 'question'], col: '#6fe05a', place: [65, 76, 'visit'],
+    chars: [{ n: 'Mary Lou', kid: { hr: '#2b1b0e', rb: '#e1a400' } },
+            { n: 'Sidney', kid: { hr: '#6b3f1d', rb: '#27ae60' } }] },
+  { id: 'pete', name: 'Pete the Cat', emo: ['note', 'star', 'smile'], col: '#3a7bd5', place: [125, 121, 'dance'],
+    chars: [{ n: 'Pete the Cat', an: 'cat', ac: '#3a7bd5' }] },
+  { id: 'arthur', name: 'Arthur', emo: ['book', 'smile', 'heart'], col: '#c98a4a', place: [209, 91, 'treat'],
+    chars: [{ n: 'Arthur', an: 'aard', ac: '#c98a4a', gl: true },
+            { n: 'D.W.', an: 'aard', ac: '#d9a066', ac2: '#ff7ab8' },
+            { n: 'Buster', an: 'rabbit', ac: '#fff' }] },
+  { id: 'junie', name: 'Junie B. Jones', emo: ['excl', 'smile', 'heart'], col: '#ff7ab8', place: [294, 114, 'bus'],
+    chars: [{ n: 'Junie B.', kid: { hr: '#6b3f1d', rb: '#e33' } },
+            { n: 'May', kid: { hr: '#d9a441', rb: '#9b59b6' } }] },
+  { id: 'frog', name: 'Frog and Toad', emo: ['flower', 'smile', 'heart'], col: '#4cb84c', place: [240, 127, 'feed'],
+    chars: [{ n: 'Frog', an: 'frog', ac: '#4cb84c' }, { n: 'Toad', an: 'frog', ac: '#8a7a3a' }] },
+  { id: 'eleph', name: 'Elephant and Piggie', emo: ['heart', 'star', 'smile'], col: '#9aa5b5', place: [190, 102, 'balloon'],
+    chars: [{ n: 'Gerald', an: 'ele', ac: '#9aa5b5' }, { n: 'Piggie', an: 'pig', ac: '#ff9ac0', ac2: '#ff7a9a' }] },
+  { id: 'dogman', name: 'Dog Man', emo: ['excl', 'star', 'smile'], col: '#2a5fd0', place: [276, 192, 'bark'],
+    chars: [{ n: 'Dog Man', an: 'dog', ac: '#f0f0f0', ac2: '#2a5fd0' }, { n: 'Petey', an: 'cat', ac: '#e8873a' }] },
+];
+const BOOK_SERIES_NOTES = {
+  mth: 'Tree house in the trees, Jack and Annie visit', hh: 'Harry, Doug, Song Lee stay; ants, slime, mud', pete: 'Big white sneakers, Pete dances',
+  arthur: 'Ice-cream cart, Arthur and friends', junie: 'Bus-stop sign, Junie B. visits', frog: 'Hopping frogs by the pond',
+  eleph: 'Balloons, Gerald and Piggie', dogman: 'Doghouse, Dog Man and Petey',
+};
+
+// ---- Holidays: costumes for people, decorations, weather and special events ----
+const HOLIDAYS = [
+  { id: 'halloween', name: 'Halloween', note: 'Pumpkins, bats, witch hats, parade', costumes: ['witch', 'cat'] },
+  { id: 'thanks', name: 'Thanksgiving', note: 'Autumn leaves, feast, turkey', costumes: ['pilgrim', 'feather'] },
+  { id: 'xmas', name: 'Christmas', note: 'Snow, lights, Santa’s sleigh', costumes: ['santa', 'antlers', 'santa'] },
+  { id: 'valentine', name: 'Valentine’s Day', note: 'Hearts and cards', costumes: ['heart'] },
+  { id: 'easter', name: 'Easter', note: 'Eggs to find, bunny ears', costumes: ['bunny'] },
+];
+const TREE_DEFAULT = ['#173a1f', '#2f7d3a', '#3f9a4b', '#256a30'];
+let treeColors = TREE_DEFAULT;
+
+Object.assign(ITEM_SPRITES, { egg: ['#ff9ad5', 2, 3, '#fff'], egg2: ['#6ef', 2, 3, '#fff'], egg3: ['#ffe066', 2, 3, '#fff'],
+  gift: ['#e33', 3, 3, '#ffe066'], card: ['#fff', 3, 2, '#e33'] });
+
+// ---- Settings window ----
+function loadConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (saved) {
+      settings.series = saved.series.filter(id => BOOK_SERIES.some(s => s.id === id));
+      settings.holidays = saved.holidays.filter(id => HOLIDAYS.some(h => h.id === id));
+    }
+  } catch (e) { /* storage unavailable: keep defaults */ }
+}
+function saveConfig() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
+}
+function buildSettingsUI() {
+  const option = (group, id, name, note) =>
+    `<label class="opt"><input type="checkbox" data-group="${group}" value="${id}"><b>${name}</b><small>${note}</small></label>`;
+  byId('seriesList').innerHTML = BOOK_SERIES.map(s => option('series', s.id, s.name, BOOK_SERIES_NOTES[s.id])).join('');
+  byId('holList').innerHTML = HOLIDAYS.map(h => option('holidays', h.id, h.name, h.note)).join('');
+  byId('cfgBtn').onclick = () => { syncChecks(); byId('modal').hidden = false; };
+  byId('cfgCancel').onclick = () => { byId('modal').hidden = true; };
+  byId('cfgSave').onclick = () => { readChecks(); byId('modal').hidden = true; applyConfig(); };
+  byId('cfgAll').onclick = () => setAllChecked('series', true);
+  byId('cfgNone').onclick = () => setAllChecked('series', false);
+}
+const allCheckboxes = () => Array.from(document.querySelectorAll('#modal input[type=checkbox]'));
+const syncChecks = () => allCheckboxes().forEach(i => { i.checked = settings[i.dataset.group].includes(i.value); });
+const setAllChecked = (group, on) => allCheckboxes().forEach(i => { if (i.dataset.group === group) i.checked = on; });
+function readChecks() {
+  ['series', 'holidays'].forEach(group => {
+    settings[group] = allCheckboxes().filter(i => i.dataset.group === group && i.checked).map(i => i.value);
+  });
+}
+
+// Apply the settings: re-colour trees, rename/clear special characters, dress everyone, rebuild the scenery
+function applyConfig() {
+  const h = settings.holidays;
+  treeColors = h.includes('xmas') ? ['#0f3a24', '#1f6a3a', '#2f8a4a', '#185a30']
+    : h.includes('thanks') ? ['#6a2f0d', '#d2691e', '#f0a030', '#a8501a']
+    : h.includes('halloween') ? ['#2a1a30', '#5a3a6a', '#7a5a8a', '#3a2a4a'] : TREE_DEFAULT;
+  const hh = settings.series.includes('hh');
+  [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [40, 'Miss Mackle']].forEach(([i, n]) => { people[i].name = hh ? n : null; });
+  people.splice(44);            // remove any visitors currently on screen
+  people.forEach(giveCostume);
+  rebuildWorld();
+  saveConfig();
+}
+function rebuildWorld() {
+  blocked.fill(0); stepCost.fill(1); edgeDistance.fill(-1);
+  buildWalkGrid(); blockPropCells(); buildEdgeDistanceMap(); drawStaticScene();
+}
+
+/* ---------- Costumes (drawn on top of the normal hat/hair) ---------- */
+function giveCostume(c) {
+  c.cos = null;
+  if (!settings.holidays.length || Math.random() > .75) return;
+  const holiday = pickOne(settings.holidays);
+  c.cos = pickOne(HOLIDAYS.find(x => x.id === holiday).costumes);
+}
+// x = centre, hy = y of the top of the head
+function drawCostume(c, x, hy) {
+  switch (c.cos) {
+    case 'witch': drawRect(x - 4, hy - 1, 9, 1, '#222'); drawRect(x - 2, hy - 3, 5, 2, '#222'); drawRect(x - 1, hy - 6, 3, 3, '#222'); drawRect(x - 2, hy - 2, 5, 1, '#f90'); break;
+    case 'cat': drawRect(x - 3, hy - 2, 2, 2, '#222'); drawRect(x + 2, hy - 2, 2, 2, '#222'); break;
+    case 'pilgrim': drawRect(x - 3, hy - 4, 7, 4, '#222'); drawRect(x - 4, hy, 9, 1, '#222'); drawRect(x - 1, hy - 1, 3, 1, '#ffd84a'); break;
+    case 'feather': drawRect(x - 2, hy, 5, 1, '#8b5a2b'); drawRect(x - 1, hy - 3, 1, 3, '#e33'); drawRect(x + 1, hy - 3, 1, 3, '#fd3'); drawRect(x, hy - 4, 1, 4, '#39f'); break;
+    case 'santa': drawRect(x - 3, hy - 1, 7, 2, '#d22'); drawRect(x - 2, hy - 3, 5, 2, '#d22'); drawRect(x + 2, hy - 5, 2, 2, '#d22'); drawRect(x + 3, hy - 6, 2, 2, '#fff'); drawRect(x - 3, hy + 1, 7, 1, '#fff'); break;
+    case 'antlers': drawRect(x - 3, hy - 4, 1, 4, '#8b5a2b'); drawRect(x + 3, hy - 4, 1, 4, '#8b5a2b'); drawRect(x - 4, hy - 4, 1, 1, '#8b5a2b'); drawRect(x + 4, hy - 4, 1, 1, '#8b5a2b'); break;
+    case 'heart': drawRect(x - 3, hy - 2, 2, 2, '#f44'); drawRect(x + 2, hy - 2, 2, 2, '#f44'); drawRect(x - 2, hy, 5, 1, '#f9a'); break;
+    case 'bunny': drawRect(x - 2, hy - 5, 1, 5, '#fff'); drawRect(x + 2, hy - 5, 1, 5, '#fff'); drawRect(x - 2, hy - 4, 1, 2, '#f9a'); drawRect(x + 2, hy - 4, 1, 2, '#f9a'); break;
+  }
+}
+
+/* ---------- Animal visitors (Pete, Arthur, Frog, ...). Kids reuse the normal student sprite. ---------- */
+function drawAnimal(c, x, y, b) {
+  const col = c.ac, acc = c.ac2 || col, t = c.an;
+  b += (c.s === 'gdo' && Math.sin(clock * 9 + c.id) > 0) ? 1 : 0;       // little dance while visiting
+  drawRect(x - 2, y - 2, 2, 2, col); drawRect(x + 1, y - 2, 2, 2, col);             // legs
+  drawRect(x - 3, y - 7 - b, 6, 5, col);                                     // body
+  if (t === 'dog') drawRect(x - 3, y - 6 - b, 6, 3, acc);                    // police shirt
+  drawRect(x + 3, y - 5 - b, 2, 1, col);                                     // tail
+  drawRect(x - 3, y - 12 - b, 7, 5, col);                                    // head
+  if (t === 'cat') { drawRect(x - 3, y - 14 - b, 2, 2, col); drawRect(x + 2, y - 14 - b, 2, 2, col); }
+  else if (t === 'rabbit') { drawRect(x - 2, y - 17 - b, 2, 5, col); drawRect(x + 1, y - 17 - b, 2, 5, col); }
+  else if (t === 'ele') { drawRect(x - 5, y - 11 - b, 2, 4, col); drawRect(x + 4, y - 11 - b, 2, 4, col); drawRect(x - 1, y - 9 - b, 3, 5, col); }
+  else if (t === 'pig') { drawRect(x - 3, y - 14 - b, 2, 2, acc); drawRect(x + 2, y - 14 - b, 2, 2, acc); drawRect(x - 1, y - 9 - b, 3, 2, acc); }
+  else if (t === 'aard') { drawRect(x - 3, y - 14 - b, 2, 2, col); drawRect(x + 2, y - 14 - b, 2, 2, col); drawRect(x - 1, y - 9 - b, 5, 2, c.ac2 || col); }
+  else if (t === 'dog') { drawRect(x - 4, y - 12 - b, 1, 4, '#222'); drawRect(x + 4, y - 12 - b, 1, 4, '#222'); drawRect(x - 1, y - 9 - b, 3, 2, '#222'); }
+  else if (t === 'frog') { drawRect(x - 3, y - 14 - b, 3, 2, col); drawRect(x + 1, y - 14 - b, 3, 2, col); }
+  drawRect(x - 2, y - 11 - b, 1, 1, '#222'); drawRect(x + 2, y - 11 - b, 1, 1, '#222');
+  if (c.gl) { drawRect(x - 3, y - 11 - b, 3, 1, '#222'); drawRect(x + 1, y - 11 - b, 3, 1, '#222'); }
+}
+
+/* ---------- Visitors: characters from the chosen book series walk in, interact, and leave ---------- */
+// Places a visitor might stop at to "join in": [x, y, what they do there]
+const VISITOR_PLACES = [{ pt: [63, 135], act: 'water' }, { pt: [250, 72], act: 'stage' }, { pt: [165, 56], act: 'magic' },
+                { pt: [232, 141], act: 'feed' }, { pt: [168, 98], act: 'plaza' }];
+let visitCountdown = 8, nextVisitorId = 900;
+const shuffle = a => a.slice().sort(() => Math.random() - .5);
+const residentsOnScreen = () => people.filter(c => !c.guest && !c.tc && c.s !== 'away' && c.s !== 'flee');
+
+function startVisit() {
+  if (!settings.series.length || people.filter(c => c.guest).length >= 4) return;
+  const pool = settings.series.map(id => BOOK_SERIES.find(s => s.id === id));
+  const n = pickOne([1, 1, 2, 2, 3]);
+  const members = [];                       // list of [series, character spec]
+  if (Math.random() < .6 || pool.length < 2) {           // a group from one series...
+    const s = pickOne(pool);
+    shuffle(s.chars).slice(0, n).forEach(ch => members.push([s, ch]));
+  } else {                                                // ...or a mixed group from different series
+    for (let i = 0; i < n; i++) { const s = pickOne(pool); const ch = pickOne(s.chars); if (!members.some(m => m[1] === ch)) members.push([s, ch]); }
+  }
+  const group = { stops: planVisitStops(members) };
+  const left = Math.random() < .5, sy = randomBetween(93, 101);
+  members.forEach(([series, spec], i) => {
+    const c = createVisitor(spec, series);
+    c.grp = group; c.si = 0; c.off = [[0, 0], [-9, 3], [9, 3]][i];
+    c.x = (left ? -12 : WIDTH + 12) + (left ? -1 : 1) * i * 10; c.y = sy;
+    people.push(c);
+    goToNextStop(c);
+  });
+}
+function createVisitor(spec, series) {
+  const c = { id: nextVisitorId++, guest: true, series, name: spec.n, tc: false, tn: -1, hm: null, x: 0, y: 0, tx: 0, ty: 0, s: 'go', w: 0,
+    ph: randomBetween(0, 6), sk: pickOne(SKIN_TONES), hr: '#2b1b0e', hc: '#33264f', rb: '#888', ht: false, em: null, item: null, act: null, sp: 0, last: null,
+    then: 'stop', ex: 0, ey: 0, ret: 0, frz: 0, ec: 0, jx: 0, hid: false, cos: null };
+  Object.assign(c, spec.kid || {});
+  if (spec.an) Object.assign(c, { an: spec.an, ac: spec.ac, ac2: spec.ac2, gl: spec.gl });
+  giveCostume(c);
+  return c;
+}
+// A visit is a short list of stops: the series' favourite place, greeting a student, joining an activity...
+function planVisitStops(members) {
+  const stops = [];
+  new Set(members.map(m => m[0])).forEach(s => stops.push({ k: 'prop', pt: s.place, act: s.place[2], dur: randomBetween(5, 8) }));
+  stops.push({ k: 'kid', dur: randomBetween(3, 5) });
+  const place = pickOne(VISITOR_PLACES);
+  stops.push({ k: 'place', pt: place.pt, act: place.act, dur: randomBetween(4, 6) });
+  if (Math.random() < .6) stops.push({ k: 'kid', dur: randomBetween(3, 5) });
+  return shuffle(stops);
+}
+function stopLocation(st) {
+  if (st.k === 'kid') {
+    if (!st.who || st.who.s === 'away') st.who = pickOne(residentsOnScreen());
+    return st.who ? [st.who.x + 8, st.who.y] : [160, 98];
+  }
+  return st.pt;
+}
+function goToNextStop(c) {
+  const st = c.grp.stops[c.si++];
+  if (!st) return sendVisitorHome(c);
+  const pt = stopLocation(st);
+  c.cur = st;
+  sendTo(c, pt[0] + c.off[0], pt[1] + c.off[1], 'stop');
+}
+function beginVisitStop(c) { c.s = 'gdo'; c.w = c.cur.dur; c.ec = 0; c.hid = c.cur.act === 'climb'; }
+function sendVisitorHome(c) {            // walk to the nearest screen edge (same route logic as running away, but calmly)
+  const pp = routeToNearestEdge(c.x, c.y), L = pp.length ? pp[pp.length - 1] : [c.x, c.y];
+  c.hid = false; c.s = 'flee'; c.path = pp;
+  c.tx = L[0] < 4 ? -14 : L[0] > WIDTH - 4 ? WIDTH + 14 : L[0];
+  c.ty = L[1] < 4 ? -16 : L[1] > HEIGHT - 4 ? HEIGHT + 16 : L[1];
+}
+// Called first from updC. Returns true when the visitor logic handled this frame.
+function updateVisitor(c, dt) {
+  if (c.s === 'idle') { c.si = Math.max(0, c.si - 1); goToNextStop(c); return true; }   // calmed down after a scare: resume
+  if (c.s !== 'gdo') return false;
+  c.w -= dt; c.ec -= dt;
+  if (c.ec <= 0) { c.ec = randomBetween(1.4, 2.4); visitorAction(c); }
+  if (c.w <= 0) { c.hid = false; goToNextStop(c); }
+  return true;
+}
+function visitorAction(c) {
+  const st = c.cur, ser = c.series;
+  showEmoji(c, pickOne(ser.emo), 1.4);
+  spawnParticle(c.x + randomBetween(-4, 4), c.y - 10, ser.col, -12, .9);
+  if (st.k === 'kid' && st.who) showEmoji(st.who, pickOne(['heart', 'smile', 'star', 'note']), 1.5);
+  if (st.act === 'water') plants.forEach(p => { p.g = Math.min(1, p.g + .08); });
+  if (st.act === 'feed') spawnParticle(c.x + 3, c.y - 3, '#e0b070', 8, .6, 30);
+  if (st.act === 'climb') for (let i = 0; i < 6; i++) spawnParticle(306 + randomBetween(-6, 6), 84, '#ffe066', randomBetween(-25, -8), .8);
+  if (st.act === 'magic') spawnParticle(165 + randomBetween(-8, 8), 56, '#b68cff', -14, .8);
+  if (st.act === 'stage') showEmoji(c, 'note', 1.4);
+}
+function removeFinishedVisitors() {
+  for (let i = people.length - 1; i >= 44; i--) if (people[i].guest && people[i].s === 'away') people.splice(i, 1);
+}
+
+/* ---------- Props: little scenery pieces that refer to the chosen books ---------- */
+function drawBookProps() {
+  const on = id => settings.series.includes(id);
+  if (on('hh')) { drawRectOutline(36, 41, 4, 4); drawRect(36, 41, 4, 4, '#6fe05a'); drawRect(37, 40, 2, 1, '#aaa'); }                       // jar of green slime on a desk
+  if (on('pete')) [[118, 112], [125, 112]].forEach(([x, y]) => { drawRectOutline(x, y, 6, 4); drawRect(x, y, 6, 4, '#fff'); drawRect(x, y + 3, 6, 1, '#d33'); drawRect(x + 1, y + 1, 2, 1, '#39f'); });
+  if (on('arthur')) { drawRectOutline(203, 78, 12, 8); drawRect(203, 78, 12, 8, '#ff9ac0'); drawRect(203, 78, 12, 2, '#fff'); drawRect(205, 81, 3, 4, '#fff'); drawRect(209, 81, 3, 4, '#c98a4a'); drawRect(205, 75, 8, 3, '#e33'); }  // ice-cream cart
+  if (on('junie')) { drawRect(302, 106, 2, 8, '#6b4423'); drawRectOutline(298, 100, 10, 6); drawRect(298, 100, 10, 6, '#ffd84a'); drawRect(300, 102, 6, 2, '#222'); }  // bus stop sign
+  if (on('dogman')) { drawRectOutline(270, 174, 14, 9); drawRect(270, 174, 14, 9, '#c0392b'); drawRect(268, 171, 18, 3, '#222'); drawRect(274, 177, 6, 6, '#2a1a14'); }  // doghouse
+  drawHolidayDecorations();
+}
+function blockPropCells() {
+  const on = id => settings.series.includes(id), h = id => settings.holidays.includes(id);
+  if (on('pete')) blockRect(117, 111, 16, 6);
+  if (on('arthur')) blockRect(202, 77, 14, 10);
+  if (on('junie')) blockRect(301, 108, 4, 6);
+  if (on('dogman')) blockRect(269, 170, 16, 13);
+  if (h('thanks')) { blockRect(118, 160, 14, 8); blockRect(204, 164, 14, 8); }
+  if (h('xmas')) blockRect(226, 168, 10, 12);
+}
+// The Magic Tree House lives in the tree at the right edge; Christmas trees get lights
+function decorateTree(x, y) {
+  if (settings.series.includes('mth') && x === 306) {
+    drawRect(x - 9, y - 29, 18, 2, '#8a5a3a'); drawRectOutline(x - 6, y - 38, 12, 9); drawRect(x - 6, y - 38, 12, 9, '#c68a4e');
+    drawRect(x - 8, y - 41, 16, 3, '#b4573d'); drawRect(x - 1, y - 35, 3, 3, '#9ad4ff');
+    for (let i = 0; i < 6; i++) drawRect(x + 7, y - 27 + i * 4, 3, 1, '#c9a878');          // rope ladder
+  }
+  if (settings.holidays.includes('xmas')) {
+    fillEllipse(x, y - 22, 5, 2, '#fff');
+    for (let i = 0; i < 7; i++) { const a = i * .9 + x; drawRect(x + Math.cos(a) * 7, y - 14 + Math.sin(a) * 6, 1, 1, ['#e33', '#fd3', '#39f', '#fff'][(i + (clock * 2 | 0)) % 4]); }
+  }
+}
+
+/* ---------- Holiday decorations (static = painted once into the background) ---------- */
+function drawHolidayDecorations() {
+  const h = id => settings.holidays.includes(id);
+  const pumpkin = (x, y) => { fillEllipse(x, y, 4, 3, '#2a1a14'); fillEllipse(x, y, 3, 2, '#f08a1a'); drawRect(x, y - 4, 1, 2, '#3a7a2a'); drawRect(x - 2, y - 1, 1, 1, '#2a1a14'); drawRect(x + 1, y - 1, 1, 1, '#2a1a14'); drawRect(x - 1, y + 1, 3, 1, '#2a1a14'); };
+  const bunting = (colors) => { for (let x = 24; x < 126; x += 5) drawRect(x, 34 + (x / 5 & 1), 3, 3, colors[(x / 5 | 0) % colors.length]); };
+  if (h('halloween')) {
+    [[122, 108], [196, 108], [290, 108], [148, 112]].forEach(([x, y]) => pumpkin(x, y));
+    bunting(['#f08a1a', '#6a3fb5']);
+    for (let i = 0; i < 8; i++) { drawRect(22 + i, 33 + i, 1, 1, '#ccc'); drawRect(22 + i * 2, 33, 1, 1, '#ccc'); }        // cobweb in the corner
+  }
+  if (h('thanks')) {
+    [[118, 160], [204, 164]].forEach(([x, y]) => { drawRectOutline(x, y, 14, 8); drawRect(x, y, 14, 8, '#d9b24a'); for (let i = 2; i < 14; i += 3) drawRect(x + i, y, 1, 8, '#b8902f'); });
+    pumpkin(196, 108); pumpkin(292, 108);
+    bunting(['#d2691e', '#e1a400', '#a8501a']);
+  }
+  if (h('xmas')) {
+    for (let i = 0; i < 450; i++) drawRect(randomBetween(0, WIDTH), randomBetween(0, HEIGHT), 1, 1, '#fff');                                  // snow sparkle on the ground
+    [[26, 23], [110, 23]].forEach(([x, y]) => { fillEllipse(x + 7, y + 3, 4, 3, '#1f6a3a'); drawRect(x + 6, y + 5, 2, 2, '#e33'); });   // wreaths on the windows
+    [[292, 107], [299, 109]].forEach(([x, y], i) => { drawRectOutline(x, y, 5, 4); drawRect(x, y, 5, 4, ['#e33', '#39f'][i]); drawRect(x + 2, y, 1, 4, '#ffe066'); });  // presents
+    drawRectOutline(228, 172, 6, 6); fillEllipse(231, 174, 5, 5, '#fff'); fillEllipse(231, 168, 4, 4, '#fff'); drawRect(230, 167, 1, 1, '#222'); drawRect(232, 167, 1, 1, '#222'); drawRect(231, 168, 3, 1, '#f90');  // snowman
+  }
+  if (h('valentine')) {
+    for (let x = 24; x < 126; x += 8) { drawRect(x, 34, 2, 2, '#ff4a7a'); drawRect(x + 2, 34, 2, 2, '#ff4a7a'); drawRect(x + 1, 36, 2, 1, '#ff4a7a'); }
+    for (let x = 200; x < 300; x += 10) { drawRect(x, 17, 2, 2, '#ff9ad5'); drawRect(x + 2, 17, 2, 2, '#ff9ad5'); drawRect(x + 1, 19, 2, 1, '#ff9ad5'); }
+  }
+  if (h('easter')) {
+    let s = 7; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+    for (let i = 0; i < 18; i++) { const x = 120 + r() * 190, y = 110 + r() * 80; if (((x - 265) / 32) ** 2 + ((y - 140) / 19) ** 2 < 1) continue; drawRect(x, y, 2, 3, ['#ff9ad5', '#6ef', '#ffe066', '#c58cff'][i % 4]); drawRect(x, y + 1, 2, 1, '#fff'); }
+  }
+}
+function drawExtraScenery() { drawBookProps(); }
+
+/* ---------- Things that move in the scene (drawn before characters) ---------- */
+const bulb = (x, y) => drawRect(x, y, 2, 2, ['#e33', '#fd3', '#3a3', '#39f'][(Math.floor(clock * 2) + (x >> 3)) % 4]);
+function butterfly(x, y, c) { const f = Math.sin(clock * 18 + x) > 0 ? 1 : 0; drawRect(x - 2, y - f, 2, 2, c); drawRect(x + 1, y - f, 2, 2, c); drawRect(x, y, 1, 2, '#222'); }
+function drawAnimatedScenery() {
+  [0, 1, 2].forEach(i => butterfly(60 + Math.cos(clock * .5 + i * 2) * 40, 138 + Math.sin(clock * .7 + i * 2) * 25, ['#ff9ad5', '#ffe066', '#6ef'][i]));
+  if (settings.series.includes('frog')) [[238, 131], [286, 152]].forEach(([x, y], i) => {          // frogs hopping by the pond
+    const hop = Math.max(0, Math.sin(clock * 2.5 + i * 3)) * 3;
+    drawRect(x, y - hop, 4, 3, '#2a8a2a'); drawRect(x, y - hop - 1, 1, 1, '#fff'); drawRect(x + 3, y - hop - 1, 1, 1, '#fff');
+  });
+  if (settings.series.includes('eleph')) {                                                        // two balloons tied to a stake
+    drawRect(184, 98, 1, 6, '#8a5a3a');
+    [['#9aa5b5', -4], ['#ff9ac0', 4]].forEach(([c, dx], i) => { const sx = 184 + dx + Math.sin(clock + i) * 2; drawRect(184, 92, 1, 6, '#ddd'); fillEllipse(sx, 86, 4, 5, '#1b1228'); fillEllipse(sx, 86, 3, 4, c); drawRect(sx - 1, 84, 1, 1, '#fff'); });
+  }
+  if (settings.holidays.includes('xmas')) { for (let x = 20; x <= 132; x += 8) bulb(x, 14); for (let x = 198; x <= 302; x += 8) bulb(x, 9); }
+}
+
+/* ---------- Extra special events ----------
+ * Each event: text (banner), dur (seconds), emo (emojis students show), and optional
+ *   start(e), update(e,dt), ground(e) [drawn under characters], draw(e,t,fade) [drawn on top]. */
+const EXTRA_EVENTS = {};
+function addSpecialEvent(key, def) { EVENT_INFO[key] = [def.text, def.dur]; EVENT_EMOJIS[key] = def.emo; EXTRA_EVENTS[key] = def; }
+// Which series / holiday must be switched on for an event to be possible (no entry = always possible)
+const EVENT_GATE = { ants: 'hh', slime: 'hh', mud: 'hh', wedding: 'hh', ghost: ['hh', 'halloween'], timetravel: 'mth',
+  parade: 'halloween', bats: 'halloween', feast: 'thanks', turkey: 'thanks', santa: 'xmas', snowball: 'xmas', valentines: 'valentine', egghunt: 'easter' };
+function chooseSpecialEvent() {
+  const ok = k => { const g = EVENT_GATE[k]; return !g || [].concat(g).some(id => settings.series.includes(id) || settings.holidays.includes(id)); };
+  return pickOne(Object.keys(EVENT_INFO).filter(ok));
+}
+function randomWalkablePoint(x0, x1, y0, y1) {          // random point that is not inside a wall or the pond
+  for (let i = 0; i < 30; i++) { const x = randomBetween(x0, x1), y = randomBetween(y0, y1); if (!blocked[Math.floor(y / 4) * GRID_W + Math.floor(x / 4)]) return [x, y]; }
+  return [160, 98];
+}
+function gatherResidents(spots) {             // send residents to stand at the spots and watch until the event ends
+  shuffle(residentsOnScreen().filter(c => ['idle', 'act', 'go'].includes(c.s))).slice(0, spots.length)
+    .forEach((c, i) => { releaseSpot(c); c.item = null; sendTo(c, spots[i][0], spots[i][1], 'watch'); });
+}
+const tintScreen = (a, col) => { ctx.globalAlpha = a; drawRect(0, 0, WIDTH, HEIGHT, col); ctx.globalAlpha = 1; };
+
+// --- Everyday events ---
+addSpecialEvent('butterflies', { text: 'A cloud of butterflies!', dur: 14, emo: ['flower', 'heart', 'smile'],
+  start(e) { e.fl = [...Array(14)].map(() => ({ a: randomBetween(0, 6.28), r: randomBetween(20, 60), cx: randomBetween(60, 260), cy: randomBetween(60, 150), s: randomBetween(.6, 1.2), c: pickOne(['#ff9ad5', '#ffe066', '#6ef', '#c58cff', '#ff9a3a']) })); },
+  draw(e, t, f) { ctx.globalAlpha = f; e.fl.forEach(b => butterfly(b.cx + Math.cos(t * b.s + b.a) * b.r, b.cy + Math.sin(t * b.s * 1.3 + b.a) * b.r * .5, b.c)); ctx.globalAlpha = 1; } });
+addSpecialEvent('bubbles', { text: 'Bubble party!', dur: 14, emo: ['smile', 'sparkle', 'heart'],
+  start(e) { e.b = [...Array(40)].map(() => ({ x: randomBetween(10, 310), d: randomBetween(0, 8), v: randomBetween(10, 20), p: randomBetween(0, 6) })); },
+  draw(e, t, f) { ctx.globalAlpha = f * .9; e.b.forEach(b => { const k = t - b.d, y = HEIGHT - k * b.v; if (k > 0 && y > -4) drawRectOutline(b.x + Math.sin(k * 2 + b.p) * 6, y, 3, 3, '#bfe9ff'); }); ctx.globalAlpha = 1; } });
+addSpecialEvent('stars', { text: 'Make a wish! Shooting stars!', dur: 13, emo: ['star', 'sparkle', 'heart'],
+  draw(e, t, f) {
+    tintScreen(f * .35, '#0a1030'); ctx.globalAlpha = f;
+    for (let i = 0; i < 30; i++) if (Math.sin(t * 3 + i * 7) > -.5) drawRect((i * 97) % WIDTH, (i * 53) % 70, 1, 1, '#fff');
+    for (let k = 0; k < 4; k++) {
+      if (t < k * 3) continue;
+      const p = ((t - k * 3) % 3) / 3, x = 40 + k * 70 + p * 90, y = 10 + p * 60 + k * 8;
+      for (let j = 0; j < 8; j++) { ctx.globalAlpha = f * (1 - j / 8); drawRect(x - j * 2, y - j, 2, 1, '#ffe9a8'); }
+    }
+    ctx.globalAlpha = 1;
+  } });
+addSpecialEvent('planes', { text: 'Paper airplane contest!', dur: 13, emo: ['excl', 'star', 'smile'],
+  draw(e, t) {
+    for (let i = 0; i < 8; i++) {
+      const p = (t * .12 + i * .11) % 1, x = -10 + p * (WIDTH + 20), y = 30 + i * 14 + Math.sin(t * 2 + i) * 8;
+      fillEllipse(x + 4, y + 30, 3, 1, 'rgba(0,0,0,.2)');
+      drawOutlined(() => { drawRect(x, y, 5, 1, '#fff'); drawRect(x + 1, y + 1, 3, 1, '#dde'); drawRect(x - 1, y - 1, 2, 1, '#fff'); });
+    }
+  } });
+addSpecialEvent('balloons', { text: 'Balloon release!', dur: 14, emo: ['heart', 'smile', 'star'],
+  start(e) { e.b = [...Array(14)].map((_, i) => ({ x: randomBetween(80, 240), v: randomBetween(8, 14), d: i * .5, c: pickOne(['#e33', '#fd3', '#39f', '#3a3', '#f6a', '#85f']) })); },
+  draw(e, t) { e.b.forEach(b => { const k = t - b.d, y = 104 - k * b.v, x = b.x + Math.sin(k) * 4; if (k < 0 || y < -10) return; drawRect(x, y + 4, 1, 10, '#ddd'); fillEllipse(x, y, 4, 5, '#1b1228'); fillEllipse(x, y, 3, 4, b.c); drawRect(x - 1, y - 2, 1, 1, '#fff'); }); } });
+
+// --- Magic Tree House: the tree house spins and a baby dinosaur strolls through ---
+function dino(x, y) {
+  const s = Math.sin(clock * 8) > 0 ? 1 : 0;
+  fillEllipse(x + 7, y + 1, 9, 2, 'rgba(0,0,0,.25)');
+  drawOutlined(() => { drawRect(x - 8, y - 6, 8, 3, '#4caf50'); drawRect(x, y - 10, 14, 7, '#4caf50'); drawRect(x + 10, y - 16, 8, 7, '#4caf50'); drawRect(x + 15, y - 14, 1, 1, '#fff');
+    drawRect(x + 3, y - 12, 2, 2, '#2e7d32'); drawRect(x + 7, y - 12, 2, 2, '#2e7d32'); drawRect(x + 3, y - 3 + s, 3, 3, '#4caf50'); drawRect(x + 9, y - 4 + (1 - s), 3, 3, '#4caf50'); });
+}
+addSpecialEvent('timetravel', { text: 'The Magic Tree House spins! A dinosaur visits!', dur: 16, emo: ['excl', 'question', 'star'],
+  update(e) { if (e.t < 5) for (let i = 0; i < 3; i++) { const a = e.t * 8 + i * 2; spawnParticle(306 + Math.cos(a) * 10, 78 + e.t * 2 + Math.sin(a) * 4, pickOne(['#ffe066', '#fff', '#6ef']), -12, .9); } },
+  draw(e, t) { if (t > 5) dino(-24 + (t - 5) / (e.d - 6) * (WIDTH + 48), 97 + Math.sin(t * 5)); } });
+
+// --- Halloween ---
+addSpecialEvent('parade', { text: 'Trick-or-treat parade!', dur: 16, emo: ['star', 'smile', 'excl'],
+  start() { gatherResidents([...Array(9)].map((_, i) => [90 + i * 15, 97])); },
+  update(e, dt) { if (Math.random() < dt * 6) spawnParticle(randomBetween(90, 220), 95, pickOne(['#f90', '#e33', '#85f', '#fd3']), -15, .8, 40); } });
+addSpecialEvent('bats', { text: 'A swarm of friendly bats!', dur: 12, emo: ['excl', 'smile', 'sweat'],
+  draw(e, t, f) {
+    tintScreen(f * .25, '#140030'); ctx.globalAlpha = f;
+    for (let i = 0; i < 16; i++) {
+      const p = (t * .1 + i * .06) % 1, x = WIDTH + 10 - p * (WIDTH + 20), y = 20 + (i * 23) % 90 + Math.sin(t * 3 + i) * 10, w = Math.sin(t * 14 + i) > 0 ? 1 : 0;
+      drawRect(x, y, 3, 1, '#222'); drawRect(x - 2, y - w, 2, 1, '#222'); drawRect(x + 3, y - w, 2, 1, '#222');
+    }
+    ctx.globalAlpha = 1;
+  } });
+
+// --- Thanksgiving ---
+const FEAST_SPOTS = [[150, 164], [162, 162], [174, 162], [186, 164], [150, 178], [162, 181], [174, 181], [186, 178], [142, 171], [194, 171]];
+addSpecialEvent('feast', { text: 'Thanksgiving feast!', dur: 18, emo: ['smile', 'heart', 'star'],
+  start() { gatherResidents(FEAST_SPOTS); },
+  ground(e) {
+    const a = Math.min(1, e.t / 2, (e.d - e.t) / 2); ctx.globalAlpha = a;
+    drawRect(155, 169, 28, 8, 'rgba(0,0,0,.2)'); drawRectOutline(154, 166, 28, 8); drawRect(154, 166, 28, 8, '#8a5a3a'); drawRect(155, 167, 26, 5, '#f4e3c3');
+    fillEllipse(168, 169, 5, 3, '#b5651d'); drawRect(158, 168, 4, 2, '#e0a040'); drawRect(176, 168, 4, 2, '#ffd84a'); drawRect(172, 170, 2, 1, '#c33');
+    ctx.globalAlpha = 1;
+  } });
+function turkey(x, y) {
+  const s = Math.sin(clock * 18) > 0 ? 1 : 0;
+  fillEllipse(x, y + 1, 6, 2, 'rgba(0,0,0,.25)');
+  drawOutlined(() => { drawRect(x - 8, y - 9, 3, 8, '#c0392b'); drawRect(x - 6, y - 11, 3, 8, '#e1a400'); drawRect(x - 4, y - 10, 3, 8, '#2e86de'); drawRect(x - 4, y - 7, 8, 6, '#8b5a2b');
+    drawRect(x + 3, y - 11, 4, 5, '#8b5a2b'); drawRect(x + 7, y - 9, 2, 1, '#f90'); drawRect(x + 6, y - 7, 1, 3, '#e33'); drawRect(x + 4, y - 10, 1, 1, '#fff');
+    drawRect(x - 2, y - 1 + s, 1, 2, '#f90'); drawRect(x + 1, y - 1 + (1 - s), 1, 2, '#f90'); });
+}
+addSpecialEvent('turkey', { text: 'A turkey is on the loose!', dur: 12, emo: ['excl', 'smile', 'question'],
+  draw(e, t) { turkey(-20 + t / e.d * (WIDTH + 40), 97 + Math.sin(t * 9) * 2); } });
+
+// --- Christmas ---
+function sleigh(x, y) {
+  fillEllipse(x + 20, 100, 22, 3, 'rgba(0,0,0,.18)');
+  drawOutlined(() => {
+    drawRect(x - 3, y - 3, 5, 5, '#8b5a2b'); drawRect(x, y, 14, 5, '#c0392b'); drawRect(x - 1, y + 5, 16, 1, '#ffd84a'); drawRect(x + 4, y - 6, 5, 6, '#d22'); drawRect(x + 5, y - 9, 3, 3, '#f6d2b0'); drawRect(x + 4, y - 11, 5, 2, '#d22');
+    for (let k = 0; k < 3; k++) { const dx = x + 20 + k * 11, s = Math.sin(clock * 10 + k) > 0 ? 1 : 0;
+      drawRect(x + 14, y + 2, dx - x - 14, 1, '#ffd84a'); drawRect(dx, y, 7, 4, '#8b5a2b'); drawRect(dx + 6, y - 3, 3, 3, '#8b5a2b'); drawRect(dx + 7, y - 5, 1, 2, '#8b5a2b');
+      drawRect(dx + 1, y + 4 + s, 1, 2, '#8b5a2b'); drawRect(dx + 5, y + 5 - s, 1, 2, '#8b5a2b'); if (k === 2) drawRect(dx + 9, y - 2, 1, 1, '#f22'); }
+  });
+}
+addSpecialEvent('santa', { text: 'Santa’s sleigh flies over!', dur: 14, emo: ['star', 'excl', 'smile'],
+  update(e, dt) {
+    if (Math.random() < dt * 4) spawnParticle(-40 + e.t / e.d * (WIDTH + 80), 32, pickOne(['#e33', '#3a3', '#fd3', '#39f']), 25, 1.5, 40, 2);
+    if (!e.gifts && e.t > 6) { e.gifts = 1; for (let i = 0; i < 6; i++) { const p = randomWalkablePoint(40, 300, 95, 101); droppedItems.push({ x: p[0], y: p[1], it: 'gift', t: 40 }); } }
+  },
+  draw(e, t) { sleigh(-40 + t / e.d * (WIDTH + 80), 26 + Math.sin(t * 2) * 5); } });
+addSpecialEvent('snowball', { text: 'Snowball fight!', dur: 14, emo: ['smile', 'excl', 'star'],
+  update(e, dt) {
+    e.sb = (e.sb || 0) - dt; if (e.sb > 0) return; e.sb = .45;
+    const p = residentsOnScreen().filter(c => c.s !== 'freeze'); if (p.length < 2) return;
+    const a = pickOne(p), b = pickOne(p); if (a === b) return;
+    particles.push({ x: a.x, y: a.y - 9, vx: (b.x - a.x) / .7, vy: (b.y - a.y) / .7 - 14, t: .7, m: .7, c: '#fff', g: 40, s: 2 });
+    showEmoji(b, 'excl', 1);
+  } });
+
+// --- Valentine's Day and Easter ---
+addSpecialEvent('valentines', { text: 'Valentine’s Day cards!', dur: 14, emo: ['heart', 'smile', 'star'],
+  start() { for (let i = 0; i < 7; i++) { const p = randomWalkablePoint(30, 300, 95, 101); droppedItems.push({ x: p[0], y: p[1], it: 'card', t: 40 }); } },
+  update(e, dt) { if (Math.random() < dt * 8) particles.push({ x: randomBetween(0, WIDTH), y: -4, vx: randomBetween(-5, 5), vy: randomBetween(10, 18), t: 12, m: 12, c: pickOne(['#ff4a7a', '#ff9ad5', '#e33']), g: 0, s: 2 }); } });
+addSpecialEvent('egghunt', { text: 'Easter egg hunt!', dur: 16, emo: ['star', 'smile', 'flower'],
+  start() { for (let i = 0; i < 14; i++) { const p = randomWalkablePoint(20, 300, 110, 190); droppedItems.push({ x: p[0], y: p[1], it: pickOne(['egg', 'egg2', 'egg3']), t: 60 }); } } });
+
+/* ---------- Called every frame: visitors, purge, holiday weather ---------- */
+function updateVisitorsAndWeather(dt) {
+  removeFinishedVisitors();
+  if (noiseMode === 'calm') { visitCountdown -= dt; if (visitCountdown <= 0) { visitCountdown = randomBetween(35, 70); startVisit(); } }
+  const h = id => settings.holidays.includes(id), drift = (c, s, vx, vy, y, t = 14) => particles.push({ x: randomBetween(0, WIDTH), y, vx, vy, t, m: t, c, g: 0, s });
+  if (h('xmas') && Math.random() < dt * 10) drift('#fff', Math.random() < .3 ? 2 : 1, randomBetween(-4, 4), randomBetween(10, 18), -3);                       // snow
+  if (h('thanks') && Math.random() < dt * 3) drift(pickOne(['#d2691e', '#e1a400', '#a8501a']), 2, randomBetween(-12, 4), randomBetween(8, 14), -3);               // falling leaves
+  if (h('valentine') && Math.random() < dt * 1.2) drift('#ff7ab8', 2, randomBetween(-3, 3), -randomBetween(8, 14), HEIGHT + 2);                                   // rising hearts
+  if (h('halloween') && Math.random() < dt * .3) particles.push({ x: WIDTH + 4, y: randomBetween(10, 70), vx: -randomBetween(25, 40), vy: randomBetween(-6, 6), t: 12, m: 12, c: '#222', g: 0, s: 2 });  // a bat
+}
+
 // ---- WALKING GRID: the map is split into 4px cells. BK = blocked cells (walls, desks, pond...), CS = path cost ----
-const GW = 80;
-const GH = 50;
-const BK = new Uint8Array(GW * GH);
-const CS = new Float32Array(GW * GH).fill(1);
-const FD = new Int16Array(GW * GH).fill(-1);
-const cells = (x, y, w, h, f) => {
+const GRID_W = 80;
+const GRID_H = 50;
+const blocked = new Uint8Array(GRID_W * GRID_H);
+const stepCost = new Float32Array(GRID_W * GRID_H).fill(1);
+const edgeDistance = new Int16Array(GRID_W * GRID_H).fill(-1);
+const forCells = (x, y, w, h, f) => {
     for (let j = Math.floor(y / 4); j <= Math.floor((y + h - .1) / 4); j++) {
         for (let i = Math.floor(x / 4); i <= Math.floor((x + w - .1) / 4); i++) {
-            if (i >= 0 && j >= 0 && i < GW && j < GH) {
-                f(j * GW + i);
+            if (i >= 0 && j >= 0 && i < GRID_W && j < GRID_H) {
+                f(j * GRID_W + i);
             }
         }
     }
 };
-const blk = (x, y, w, h) => cells(x, y, w, h, m => BK[m] = 1);
-const cost = (x, y, w, h, v) => cells(x, y, w, h, m => CS[m] = v);
+const blockRect = (x, y, w, h) => forCells(x, y, w, h, m => blocked[m] = 1);
+const setStepCost = (x, y, w, h, v) => forCells(x, y, w, h, m => stepCost[m] = v);
 // Mark every solid object on the map as blocked so characters walk around them
-function GRID() {
-    blk(16, 13, 118, 19);
-    blk(16, 13, 6, 77);
-    blk(128, 13, 6, 77);
-    blk(18, 82, 52, 8);
-    blk(88, 82, 44, 8);
-    [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => blk(x, y, 14, 6)));
-    blk(196, 10, 108, 20);
-    blk(198, 12, 8, 50);
-    blk(294, 12, 8, 50);
-    cost(198, 30, 104, 38, 6);
-    [25, 52, 79].forEach(x => [116, 140].forEach(y => blk(x, y, 22, 14)));
-    blk(104, 121, 8, 11);
-    blk(12, 108, 46, 3);
-    blk(82, 108, 34, 3);
-    blk(12, 170, 104, 3);
-    blk(12, 108, 3, 65);
-    blk(112, 108, 3, 65);
-    blk(159, 104, 26, 14);
-    TR.forEach(t => blk(t[0] - 2, t[1] - 6, 5, 7));
-    for (let j = 0; j < GH; j++) {
-        for (let i = 0; i < GW; i++) {
+function buildWalkGrid() {
+    blockRect(16, 13, 118, 19);
+    blockRect(16, 13, 6, 77);
+    blockRect(128, 13, 6, 77);
+    blockRect(18, 82, 52, 8);
+    blockRect(88, 82, 44, 8);
+    [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => blockRect(x, y, 14, 6)));
+    blockRect(196, 10, 108, 20);
+    blockRect(198, 12, 8, 50);
+    blockRect(294, 12, 8, 50);
+    setStepCost(198, 30, 104, 38, 6);
+    [25, 52, 79].forEach(x => [116, 140].forEach(y => blockRect(x, y, 22, 14)));
+    blockRect(104, 121, 8, 11);
+    blockRect(12, 108, 46, 3);
+    blockRect(82, 108, 34, 3);
+    blockRect(12, 170, 104, 3);
+    blockRect(12, 108, 3, 65);
+    blockRect(112, 108, 3, 65);
+    blockRect(159, 104, 26, 14);
+    TREES.forEach(t => blockRect(t[0] - 2, t[1] - 6, 5, 7));
+    for (let j = 0; j < GRID_H; j++) {
+        for (let i = 0; i < GRID_W; i++) {
             const x = i * 4 + 2;
             const y = j * 4 + 2;
             if (((x - 265) / 28) ** 2 + ((y - 140) / 15) ** 2 < 1) {
-                BK[j * GW + i] = 1;
+                blocked[j * GRID_W + i] = 1;
             }
         }
     }
 }
-const cl = (v, m) => Math.max(0, Math.min(m - 1, v));
+const clamp = (v, m) => Math.max(0, Math.min(m - 1, v));
 // Find the nearest walkable cell to (i,j)
-function nF(i, j) {
+function nearestFreeCell(i, j) {
     for (let r = 0; r < 8; r++) {
         for (let dj = -r; dj <= r; dj++) {
             for (let di = -r; di <= r; di++) {
@@ -696,7 +1196,7 @@ function nF(i, j) {
                 }
                 const a = i + di;
                 const b = j + dj;
-                if (a >= 0 && b >= 0 && a < GW && b < GH && !BK[b * GW + a]) {
+                if (a >= 0 && b >= 0 && a < GRID_W && b < GRID_H && !blocked[b * GRID_W + a]) {
                     return [a, b];
                 }
             }
@@ -704,9 +1204,9 @@ function nF(i, j) {
     }
     return [i, j];
 }
-const cOf = (x, y) => nF(cl(Math.floor(x / 4), GW), cl(Math.floor(y / 4), GH));
+const cellOf = (x, y) => nearestFreeCell(clamp(Math.floor(x / 4), GRID_W), clamp(Math.floor(y / 4), GRID_H));
 // Line-of-sight test: can we walk in a straight line from A to B without touching a blocked cell?
-function los(ax, ay, bx, by) {
+function hasLineOfSight(ax, ay, bx, by) {
     const d = Math.hypot(bx - ax, by - ay) || 1;
     const n = Math.ceil(d / 2);
     const nx = -(by - ay) / d;
@@ -717,7 +1217,7 @@ function los(ax, ay, bx, by) {
         for (const o of [-2, 0, 2]) {
             const i = Math.floor((x + nx * o) / 4);
             const j = Math.floor((y + ny * o) / 4);
-            if (i < 0 || j < 0 || i >= GW || j >= GH || BK[j * GW + i]) {
+            if (i < 0 || j < 0 || i >= GRID_W || j >= GRID_H || blocked[j * GRID_W + i]) {
                 return false;
             }
         }
@@ -725,12 +1225,12 @@ function los(ax, ay, bx, by) {
     return true;
 }
 // Remove unnecessary zig-zags from a route using line-of-sight
-function smooth(px, py, pts) {
+function smoothPath(px, py, pts) {
     const out = [];
     let i = 0;
     while (i < pts.length) {
         let j = pts.length - 1;
-        while (j > i && !los(px, py, pts[j][0], pts[j][1])) {
+        while (j > i && !hasLineOfSight(px, py, pts[j][0], pts[j][1])) {
             j--;
         }
         out.push(pts[j]);
@@ -742,13 +1242,13 @@ function smooth(px, py, pts) {
 }
 // A* pathfinding from (sx,sy) to (ex,ey) over the grid. Returns a list of waypoints
 function findPath(sx, sy, ex, ey) {
-    const [a, b] = cOf(sx, sy);
-    const [gc, gd] = cOf(ex, ey);
-    const S = b * GW + a;
-    const G = gd * GW + gc;
-    const gs = new Float32Array(GW * GH).fill(1e9);
-    const fr = new Int32Array(GW * GH).fill(-1);
-    const cd = new Uint8Array(GW * GH);
+    const [a, b] = cellOf(sx, sy);
+    const [gc, gd] = cellOf(ex, ey);
+    const S = b * GRID_W + a;
+    const G = gd * GRID_W + gc;
+    const gs = new Float32Array(GRID_W * GRID_H).fill(1e9);
+    const fr = new Int32Array(GRID_W * GRID_H).fill(-1);
+    const cd = new Uint8Array(GRID_W * GRID_H);
     const open = [S];
     gs[S] = 0;
     while (open.length) {
@@ -756,7 +1256,7 @@ function findPath(sx, sy, ex, ey) {
         let bf = 1e9;
         for (let k = 0; k < open.length; k++) {
             const q = open[k];
-            const f = gs[q] + Math.hypot(q % GW - gc, ((q / GW) | 0) - gd);
+            const f = gs[q] + Math.hypot(q % GRID_W - gc, ((q / GRID_W) | 0) - gd);
             if (f < bf) {
                 bf = f;
                 bi = k;
@@ -767,8 +1267,8 @@ function findPath(sx, sy, ex, ey) {
             break;
         }
         cd[n] = 1;
-        const ni = n % GW;
-        const nj = (n / GW) | 0;
+        const ni = n % GRID_W;
+        const nj = (n / GRID_W) | 0;
         for (let dj = -1; dj <= 1; dj++) {
             for (let di = -1; di <= 1; di++) {
                 if (!di && !dj) {
@@ -776,17 +1276,17 @@ function findPath(sx, sy, ex, ey) {
                 }
                 const i = ni + di;
                 const j = nj + dj;
-                if (i < 0 || j < 0 || i >= GW || j >= GH) {
+                if (i < 0 || j < 0 || i >= GRID_W || j >= GRID_H) {
                     continue;
                 }
-                const m = j * GW + i;
-                if (BK[m] || cd[m]) {
+                const m = j * GRID_W + i;
+                if (blocked[m] || cd[m]) {
                     continue;
                 }
-                if (di && dj && (BK[nj * GW + i] || BK[j * GW + ni])) {
+                if (di && dj && (blocked[nj * GRID_W + i] || blocked[j * GRID_W + ni])) {
                     continue;
                 }
-                const t = gs[n] + (di && dj ? 1.41 : 1) * CS[m];
+                const t = gs[n] + (di && dj ? 1.41 : 1) * stepCost[m];
                 if (t < gs[m]) {
                     if (gs[m] >= 1e9) {
                         open.push(m);
@@ -802,68 +1302,68 @@ function findPath(sx, sy, ex, ey) {
     }
     const pts = [];
     for (let q = G; q !== S && q >= 0; q = fr[q]) {
-        pts.push([(q % GW) * 4 + 2, ((q / GW) | 0) * 4 + 2]);
+        pts.push([(q % GRID_W) * 4 + 2, ((q / GRID_W) | 0) * 4 + 2]);
     }
     pts.reverse();
     pts.push([ex, ey]);
-    return smooth(sx, sy, pts);
+    return smoothPath(sx, sy, pts);
 }
 // Precompute, for every cell, the distance to the nearest screen edge (used for fleeing)
-function FLOW() {
+function buildEdgeDistanceMap() {
     const q = [];
-    for (let j = 0; j < GH; j++) {
-        for (let i = 0; i < GW; i++) {
-            if ((!i || !j || i === GW - 1 || j === GH - 1) && !BK[j * GW + i]) {
-                FD[j * GW + i] = 0;
-                q.push(j * GW + i);
+    for (let j = 0; j < GRID_H; j++) {
+        for (let i = 0; i < GRID_W; i++) {
+            if ((!i || !j || i === GRID_W - 1 || j === GRID_H - 1) && !blocked[j * GRID_W + i]) {
+                edgeDistance[j * GRID_W + i] = 0;
+                q.push(j * GRID_W + i);
             }
         }
     }
     for (let h = 0; h < q.length; h++) {
         const n = q[h];
-        const ni = n % GW;
-        const nj = (n / GW) | 0;
+        const ni = n % GRID_W;
+        const nj = (n / GRID_W) | 0;
         for (let dj = -1; dj <= 1; dj++) {
             for (let di = -1; di <= 1; di++) {
                 const i = ni + di;
                 const j = nj + dj;
-                if (i < 0 || j < 0 || i >= GW || j >= GH) {
+                if (i < 0 || j < 0 || i >= GRID_W || j >= GRID_H) {
                     continue;
                 }
-                const m = j * GW + i;
-                if (BK[m] || FD[m] >= 0) {
+                const m = j * GRID_W + i;
+                if (blocked[m] || edgeDistance[m] >= 0) {
                     continue;
                 }
-                if (di && dj && (BK[nj * GW + i] || BK[j * GW + ni])) {
+                if (di && dj && (blocked[nj * GRID_W + i] || blocked[j * GRID_W + ni])) {
                     continue;
                 }
-                FD[m] = FD[n] + 1;
+                edgeDistance[m] = edgeDistance[n] + 1;
                 q.push(m);
             }
         }
     }
 }
 // Route to the nearest screen edge by following the distance map downhill
-function fleePath(x, y) {
-    const [a, b] = cOf(x, y);
-    let n = b * GW + a;
+function routeToNearestEdge(x, y) {
+    const [a, b] = cellOf(x, y);
+    let n = b * GRID_W + a;
     const pts = [];
-    for (let k = 0; k < 200 && FD[n] > 0; k++) {
-        const ni = n % GW;
-        const nj = (n / GW) | 0;
+    for (let k = 0; k < 200 && edgeDistance[n] > 0; k++) {
+        const ni = n % GRID_W;
+        const nj = (n / GRID_W) | 0;
         let best = n;
         for (let dj = -1; dj <= 1; dj++) {
             for (let di = -1; di <= 1; di++) {
                 const i = ni + di;
                 const j = nj + dj;
-                if (i < 0 || j < 0 || i >= GW || j >= GH) {
+                if (i < 0 || j < 0 || i >= GRID_W || j >= GRID_H) {
                     continue;
                 }
-                const m = j * GW + i;
-                if (BK[m] || FD[m] < 0 || FD[m] >= FD[best]) {
+                const m = j * GRID_W + i;
+                if (blocked[m] || edgeDistance[m] < 0 || edgeDistance[m] >= edgeDistance[best]) {
                     continue;
                 }
-                if (di && dj && (BK[nj * GW + i] || BK[j * GW + ni])) {
+                if (di && dj && (blocked[nj * GRID_W + i] || blocked[j * GRID_W + ni])) {
                     continue;
                 }
                 best = m;
@@ -873,222 +1373,245 @@ function fleePath(x, y) {
             break;
         }
         n = best;
-        pts.push([(n % GW) * 4 + 2, ((n / GW) | 0) * 4 + 2]);
+        pts.push([(n % GRID_W) * 4 + 2, ((n / GRID_W) | 0) * 4 + 2]);
     }
-    return smooth(x, y, pts);
+    return smoothPath(x, y, pts);
 }
 // Draw a tree (sorted by its base so characters can walk behind it)
-function tree(x, y) {
-    E(x + 7, y + 1, 11, 3, 'rgba(0,20,0,.25)');
-    ob(x - 1, y - 6, 3, 6);
-    R(x - 1, y - 6, 3, 6, '#6b4423');
-    E(x, y - 14, 10, 9, '#173a1f');
-    E(x, y - 14, 9, 8, '#2f7d3a');
-    E(x - 2, y - 16, 5, 4, '#3f9a4b');
-    R(x + 3, y - 12, 2, 2, '#256a30');
+function drawTreeBase(x, y) {
+    fillEllipse(x + 7, y + 1, 11, 3, 'rgba(0,20,0,.25)');
+    drawRectOutline(x - 1, y - 6, 3, 6);
+    drawRect(x - 1, y - 6, 3, 6, '#6b4423');
+    fillEllipse(x, y - 14, 10, 9, treeColors[0]);
+    fillEllipse(x, y - 14, 9, 8, treeColors[1]);
+    fillEllipse(x - 2, y - 16, 5, 4, treeColors[2]);
+    drawRect(x + 3, y - 12, 2, 2, treeColors[3]);
+}
+function drawTree(x, y) {
+    drawTreeBase(x, y);
+    decorateTree(x, y);
 }
 // Classroom front wall + double doors. The doors swing open when someone walks up to them.
-let dOpen = 0;
-function fwall() {
+let doorOpenAmount = 0;
+function drawClassroomFront() {
     let n = 0;
-    cs.forEach(c => {
+    people.forEach(c => {
         if (c.s !== 'away' && Math.hypot(c.x - 79, c.y - 88) < 18) {
             n = 1;
         }
     });
-    dOpen += (n - dOpen) * .15;
+    doorOpenAmount += (n - doorOpenAmount) * .15;
     [[18, 52], [88, 44]].forEach(([x, w]) => {
-        ob(x, 82, w, 8);
-        R(x, 82, w, 8, '#d8c8a8');
-        R(x, 82, w, 2, '#b4573d');
-        R(x, 88, w, 2, '#8a5a3a');
+        drawRectOutline(x, 82, w, 8);
+        drawRect(x, 82, w, 8, '#d8c8a8');
+        drawRect(x, 82, w, 2, '#b4573d');
+        drawRect(x, 88, w, 2, '#8a5a3a');
     });
-    const o = Math.round(dOpen * 7);
+    const o = Math.round(doorOpenAmount * 7);
     const lw = 9 - o;
-    R(70, 82, 18, 8, 'rgba(0,0,0,.18)');
+    drawRect(70, 82, 18, 8, 'rgba(0,0,0,.18)');
     if (lw > 0) {
-        R(70, 83, lw, 7, '#a36a3a');
-        R(70, 83, lw, 1, '#c58a56');
-        R(79 + o, 83, lw, 7, '#a36a3a');
-        R(79 + o, 83, lw, 1, '#c58a56');
-        R(70 + lw, 86, 1, 1, '#ffe066');
-        R(78 + o, 86, 1, 1, '#ffe066');
+        drawRect(70, 83, lw, 7, '#a36a3a');
+        drawRect(70, 83, lw, 1, '#c58a56');
+        drawRect(79 + o, 83, lw, 7, '#a36a3a');
+        drawRect(79 + o, 83, lw, 1, '#c58a56');
+        drawRect(70 + lw, 86, 1, 1, '#ffe066');
+        drawRect(78 + o, 86, 1, 1, '#ffe066');
     }
-    R(18, 90, 114, 3, 'rgba(0,30,0,.25)');
+    drawRect(18, 90, 114, 3, 'rgba(0,30,0,.25)');
 }
 /* ---------- static scenery ---------- */
 // Draws everything that never moves (grass, paths, buildings, pond...) once, into an off-screen image
-function stat() {
-    g = bgc.getContext('2d');
-    R(0, 0, W, H, '#5aa14a');
+function drawStaticScene() {
+    ctx = backgroundCanvas.getContext('2d');
+    drawRect(0, 0, WIDTH, HEIGHT, '#5aa14a');
     for (let i = 0; i < 900; i++) {
-        R(rnd(0, W), rnd(0, H), 1, 1, pick(['#67b155', '#4e9040', '#6cba5a']));
+        drawRect(randomBetween(0, WIDTH), randomBetween(0, HEIGHT), 1, 1, pickOne(['#67b155', '#4e9040', '#6cba5a']));
     }
-    R(12, 90, 296, 14, '#cdb98a');
-    R(12, 90, 296, 1, '#b8a375');
-    R(12, 103, 296, 1, '#b8a375');
-    R(70, 82, 18, 10, '#cdb98a');
-    E(160, 97, 24, 9, '#d9c898');
+    drawRect(12, 90, 296, 14, '#cdb98a');
+    drawRect(12, 90, 296, 1, '#b8a375');
+    drawRect(12, 103, 296, 1, '#b8a375');
+    drawRect(70, 82, 18, 10, '#cdb98a');
+    fillEllipse(160, 97, 24, 9, '#d9c898');
     for (let i = 0; i < 130; i++) {
-        R(rnd(12, 300), rnd(91, 103), 1, 1, '#b8a375');
+        drawRect(randomBetween(12, 300), randomBetween(91, 103), 1, 1, '#b8a375');
     }
     // classroom
-    R(132, 22, 7, 70, 'rgba(0,30,0,.25)');
-    R(24, 92, 112, 5, 'rgba(0,30,0,.25)');
-    R(16, 13, 118, 4, '#b4573d');
-    R(18, 16, 114, 74, '#8a5a3a');
-    R(22, 32, 106, 50, '#d9b98a');
+    drawRect(132, 22, 7, 70, 'rgba(0,30,0,.25)');
+    drawRect(24, 92, 112, 5, 'rgba(0,30,0,.25)');
+    drawRect(16, 13, 118, 4, '#b4573d');
+    drawRect(18, 16, 114, 74, '#8a5a3a');
+    drawRect(22, 32, 106, 50, '#d9b98a');
     for (let y = 32; y < 82; y += 6) {
-        R(22, y, 106, 1, '#c9a878');
+        drawRect(22, y, 106, 1, '#c9a878');
     }
-    R(18, 17, 114, 15, '#e8d9bd');
-    R(18, 26, 114, 6, '#a8704a');
-    R(22, 32, 106, 2, 'rgba(0,0,0,.18)');
+    drawRect(18, 17, 114, 15, '#e8d9bd');
+    drawRect(18, 26, 114, 6, '#a8704a');
+    drawRect(22, 32, 106, 2, 'rgba(0,0,0,.18)');
     [[26, 19], [110, 19]].forEach(p => {
-        R(p[0], p[1], 14, 8, '#6b4a2a');
-        R(p[0] + 1, p[1] + 1, 12, 6, '#9ad4ff');
-        R(p[0] + 7, p[1] + 1, 1, 6, '#6b4a2a');
+        drawRect(p[0], p[1], 14, 8, '#6b4a2a');
+        drawRect(p[0] + 1, p[1] + 1, 12, 6, '#9ad4ff');
+        drawRect(p[0] + 7, p[1] + 1, 1, 6, '#6b4a2a');
     });
-    R(18, 16, 4, 74, '#b38355');
-    R(128, 16, 4, 74, '#b38355');
-    R(48, 36, 64, 40, 'rgba(150,60,60,.12)');
+    drawRect(18, 16, 4, 74, '#b38355');
+    drawRect(128, 16, 4, 74, '#b38355');
+    drawRect(48, 36, 64, 40, 'rgba(150,60,60,.12)');
     [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => {
-        R(x + 1, y + 6, 14, 2, 'rgba(0,0,0,.22)');
-        R(x, y, 14, 6, '#a36a3a');
-        R(x, y, 14, 1, '#c58a56');
-        R(x + 5, y + 2, 4, 2, '#fff');
+        drawRect(x + 1, y + 6, 14, 2, 'rgba(0,0,0,.22)');
+        drawRect(x, y, 14, 6, '#a36a3a');
+        drawRect(x, y, 14, 1, '#c58a56');
+        drawRect(x + 5, y + 2, 4, 2, '#fff');
     }));
     // stage
-    R(304, 20, 6, 52, 'rgba(0,30,0,.25)');
-    R(202, 70, 108, 5, 'rgba(0,30,0,.25)');
-    R(196, 12, 108, 56, '#5c3a21');
-    R(198, 30, 104, 32, '#c68a4e');
+    drawRect(304, 20, 6, 52, 'rgba(0,30,0,.25)');
+    drawRect(202, 70, 108, 5, 'rgba(0,30,0,.25)');
+    drawRect(196, 12, 108, 56, '#5c3a21');
+    drawRect(198, 30, 104, 32, '#c68a4e');
     for (let x = 198; x < 302; x += 8) {
-        R(x, 30, 1, 32, '#b27a43');
+        drawRect(x, 30, 1, 32, '#b27a43');
     }
-    R(198, 62, 104, 5, '#8a5a30');
-    R(198, 66, 104, 2, '#5c3a21');
-    R(198, 10, 104, 5, '#c53a3a');
+    drawRect(198, 62, 104, 5, '#8a5a30');
+    drawRect(198, 66, 104, 2, '#5c3a21');
+    drawRect(198, 10, 104, 5, '#c53a3a');
     [198, 294].forEach(x => {
-        R(x, 12, 8, 50, '#a3242e');
+        drawRect(x, 12, 8, 50, '#a3242e');
         for (let y = 14; y < 62; y += 4) {
-            R(x + 2, y, 1, 3, '#7f1a22');
+            drawRect(x + 2, y, 1, 3, '#7f1a22');
         }
-        R(x + 5, 14, 1, 48, '#c53a3a');
+        drawRect(x + 5, 14, 1, 48, '#c53a3a');
     });
     // garden
-    R(112, 112, 4, 62, 'rgba(0,30,0,.2)');
-    R(12, 172, 104, 3, 'rgba(0,30,0,.2)');
+    drawRect(112, 112, 4, 62, 'rgba(0,30,0,.2)');
+    drawRect(12, 172, 104, 3, 'rgba(0,30,0,.2)');
     const F = '#b58863';
     for (let x = 12; x <= 114; x += 2) {
         if (x < 58 || x > 82) {
-            R(x, 108, 1, 3, F);
+            drawRect(x, 108, 1, 3, F);
         }
     }
     for (let x = 12; x <= 114; x += 2) {
-        R(x, 170, 1, 3, F);
+        drawRect(x, 170, 1, 3, F);
     }
     for (let y = 108; y <= 172; y += 2) {
-        R(12, y, 3, 1, F);
-        R(112, y, 3, 1, F);
+        drawRect(12, y, 3, 1, F);
+        drawRect(112, y, 3, 1, F);
     }
-    R(12, 109, 102, 1, F);
-    R(12, 170, 102, 1, F);
-    R(12, 109, 1, 62, F);
-    R(113, 109, 1, 62, F);
+    drawRect(12, 109, 102, 1, F);
+    drawRect(12, 170, 102, 1, F);
+    drawRect(12, 109, 1, 62, F);
+    drawRect(113, 109, 1, 62, F);
     // barrel
-    R(104, 122, 8, 10, '#6b4423');
-    R(104, 125, 8, 1, '#3a2410');
-    R(104, 129, 8, 1, '#3a2410');
-    R(105, 121, 6, 2, '#4aa3ff');
+    drawRect(104, 122, 8, 10, '#6b4423');
+    drawRect(104, 125, 8, 1, '#3a2410');
+    drawRect(104, 129, 8, 1, '#3a2410');
+    drawRect(105, 121, 6, 2, '#4aa3ff');
     // lesson mats
-    A.lesson.s.forEach((s, i) => {
-        R(s[0] - 5, s[1] - 3, 10, 6, 'rgba(0,0,0,.2)');
-        R(s[0] - 6, s[1] - 4, 10, 6, i % 2 ? '#c05a7a' : '#4f7fc0');
+    ACTIVITIES.lesson.s.forEach((s, i) => {
+        drawRect(s[0] - 5, s[1] - 3, 10, 6, 'rgba(0,0,0,.2)');
+        drawRect(s[0] - 6, s[1] - 4, 10, 6, i % 2 ? '#c05a7a' : '#4f7fc0');
     });
-    R(162, 117, 1, 7, '#6b4423');
-    R(182, 117, 1, 7, '#6b4423');
-    R(160, 122, 26, 2, 'rgba(0,30,0,.2)');
+    drawRect(162, 117, 1, 7, '#6b4423');
+    drawRect(182, 117, 1, 7, '#6b4423');
+    drawRect(160, 122, 26, 2, 'rgba(0,30,0,.2)');
     // magic circle
-    E(166, 58, 28, 13, 'rgba(0,30,0,.2)');
-    E(165, 56, 27, 13, '#2a2a38');
-    E(165, 56, 26, 12, '#9a9aa8');
-    E(165, 56, 23, 10, '#7d7d90');
+    fillEllipse(166, 58, 28, 13, 'rgba(0,30,0,.2)');
+    fillEllipse(165, 56, 27, 13, '#2a2a38');
+    fillEllipse(165, 56, 26, 12, '#9a9aa8');
+    fillEllipse(165, 56, 23, 10, '#7d7d90');
     // pond
-    E(267, 142, 31, 18, 'rgba(0,30,0,.2)');
-    E(265, 140, 31, 18, '#2a1a14');
-    E(265, 140, 30, 17, '#7a5a3a');
-    E(265, 140, 28, 15, '#3f9ad8');
-    E(272, 143, 24, 10, '#4aa6e6');
+    fillEllipse(267, 142, 31, 18, 'rgba(0,30,0,.2)');
+    fillEllipse(265, 140, 31, 18, '#2a1a14');
+    fillEllipse(265, 140, 30, 17, '#7a5a3a');
+    fillEllipse(265, 140, 28, 15, '#3f9ad8');
+    fillEllipse(272, 143, 24, 10, '#4aa6e6');
     [[255, 135], [280, 148], [250, 148]].forEach(p => {
-        E(p[0], p[1], 4, 2, '#2e8b3e');
-        R(p[0], p[1] - 1, 1, 1, '#ff9ad5');
+        fillEllipse(p[0], p[1], 4, 2, '#2e8b3e');
+        drawRect(p[0], p[1] - 1, 1, 1, '#ff9ad5');
     });
     // flowers
     for (let i = 0; i < 60; i++) {
-        const x = rnd(0, W);
-        const y = rnd(110, H);
+        const x = randomBetween(0, WIDTH);
+        const y = randomBetween(110, HEIGHT);
         if (y > 108 && x < 116 && y < 174 || Math.hypot((x - 265) / 32, (y - 140) / 19) < 1) {
             continue;
         }
-        R(x, y, 1, 1, pick(['#fff', '#ffe066', '#ff9ad5']));
+        drawRect(x, y, 1, 1, pickOne(['#fff', '#ffe066', '#ff9ad5']));
     }
     const K = '#2a1a14';
-    ob(16, 13, 118, 77, K);
-    ob(196, 10, 108, 58, K);
-    [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => ob(x, y, 14, 6, K)));
-    [25, 52, 79].forEach(x => [116, 140].forEach(y => ob(x, y, 22, 14, '#3a2210')));
-    ob(104, 121, 8, 11, K);
-    ob(159, 104, 26, 13, K);
-    A.lesson.s.forEach(s => ob(s[0] - 6, s[1] - 4, 10, 6, K));
-    g = cv.getContext('2d');
+    drawRectOutline(16, 13, 118, 77, K);
+    drawRectOutline(196, 10, 108, 58, K);
+    [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => drawRectOutline(x, y, 14, 6, K)));
+    [25, 52, 79].forEach(x => [116, 140].forEach(y => drawRectOutline(x, y, 22, 14, '#3a2210')));
+    drawRectOutline(104, 121, 8, 11, K);
+    drawRectOutline(159, 104, 26, 13, K);
+    ACTIVITIES.lesson.s.forEach(s => drawRectOutline(s[0] - 6, s[1] - 4, 10, 6, K));
+    drawExtraScenery();
+    ctx = canvas.getContext('2d');
 }
-GRID();
-FLOW();
-stat();
 // Harry sneaks up on a classmate now and then; Doug tags along.
 // ---- HORRIBLE HARRY EXTRAS ----
 // Harry sneaks up on a classmate now and then; Doug tags along.
-let prankT = 30;
+let prankCountdown = 30;
 function prankTimer(dt) {
-    if (mode !== 'calm') {
+    if (noiseMode !== 'calm') {
         return;
     }
-    prankT -= dt;
-    if (prankT > 0) {
+    prankCountdown -= dt;
+    if (prankCountdown > 0) {
         return;
     }
-    prankT = rnd(30, 50);
-    const h = cs[0];
+    prankCountdown = randomBetween(30, 50);
+    const h = people[0];
     if (!['idle', 'act', 'go'].includes(h.s)) {
         return;
     }
-    const v = pick(cs.filter(c => !c.tc && c !== h && (c.s === 'idle' || c.s === 'act')));
+    const v = pickOne(people.filter(c => !c.tc && c !== h && (c.s === 'idle' || c.s === 'act')));
     if (!v) {
         return;
     }
-    rel(h);
+    releaseSpot(h);
     h.item = null;
     h.pv = v;
-    setT(h, v.x + 6, v.y + 1, 'prank');
+    sendTo(h, v.x + 6, v.y + 1, 'prank');
 }
 // Tiny name labels under the special characters
+// Names are drawn on a separate full-resolution canvas (#nm) laid over the pixel canvas,
+// so the text stays sharp instead of being scaled up from 320x200.
+const nameCanvas = byId('nm');
+const nameContext = nameCanvas.getContext('2d');
 function drawNames() {
-    g.font = '5px sans-serif';
-    g.textAlign = 'center';
-    g.lineWidth = 2;
-    g.strokeStyle = '#1b1228';
-    g.fillStyle = '#fff';
-    cs.forEach(c => {
-        if (!c.name || c.s === 'away') {
+    const dpr = window.devicePixelRatio || 1;
+    const pw = Math.round(nameCanvas.clientWidth * dpr);
+    const ph = Math.round(nameCanvas.clientHeight * dpr);
+    if (nameCanvas.width !== pw || nameCanvas.height !== ph) {
+        nameCanvas.width = pw;
+        nameCanvas.height = ph;
+    }
+    nameContext.clearRect(0, 0, pw, ph);
+    if (!pw) {
+        return;
+    }
+    const k = pw / WIDTH;
+    const fs = Math.max(9 * dpr, 6.5 * k);
+    nameContext.font = `700 ${fs}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif`;
+    nameContext.textAlign = 'center';
+    nameContext.textBaseline = 'top';
+    nameContext.lineJoin = 'round';
+    nameContext.lineWidth = fs * .28;
+    nameContext.strokeStyle = '#1b1228';
+    nameContext.fillStyle = '#fff';
+    people.forEach(c => {
+        if (!c.name || c.s === 'away' || c.hid) {
             return;
         }
-        g.strokeText(c.name, c.x, c.y + 8);
-        g.fillText(c.name, c.x, c.y + 8);
+        const x = (c.x + c.jx) * k;
+        const y = (c.y + 4) * k;
+        nameContext.strokeText(c.name, x, y);
+        nameContext.fillText(c.name, x, y);
     });
 }
 // Point at distance s along a polyline (used by the marching ants)
-function along(r, s) {
+function pointAlongPath(r, s) {
     for (let i = 0; i < r.length - 1; i++) {
         const a = r[i];
         const b = r[i + 1];
@@ -1107,166 +1630,179 @@ const WEDDING_SPOTS = [[160, 178], [172, 178], [140, 176], [146, 184], [140, 190
 // Wedding: the first two spots are the couple, the rest are guests who gather and watch.
 // Kickball wedding: the first two spots are the couple, the others are guests who walk over and watch
 function setupWedding() {
-    const p = cs.filter(c => !c.tc && ['idle', 'act', 'go'].includes(c.s)).sort(() => Math.random() - .5);
+    const p = people.filter(c => !c.tc && ['idle', 'act', 'go'].includes(c.s)).sort(() => Math.random() - .5);
     p.slice(0, WEDDING_SPOTS.length).forEach((c, i) => {
-        rel(c);
+        releaseSpot(c);
         c.item = null;
-        setT(c, WEDDING_SPOTS[i][0], WEDDING_SPOTS[i][1], 'watch');
+        sendTo(c, WEDDING_SPOTS[i][0], WEDDING_SPOTS[i][1], 'watch');
     });
 }
 // The flower arch for the wedding
-function arch() {
-    const a = Math.min(1, ev.t / 2, (ev.d - ev.t) / 2);
-    g.globalAlpha = a;
-    R(159, 160, 16, 20, 'rgba(255,200,220,.55)');
-    OL(() => {
-        R(153, 156, 3, 22, '#fff');
-        R(178, 156, 3, 22, '#fff');
-        R(153, 154, 28, 3, '#6c4');
+function drawWeddingArch() {
+    const a = Math.min(1, currentEvent.t / 2, (currentEvent.d - currentEvent.t) / 2);
+    ctx.globalAlpha = a;
+    drawRect(159, 160, 16, 20, 'rgba(255,200,220,.55)');
+    drawOutlined(() => {
+        drawRect(153, 156, 3, 22, '#fff');
+        drawRect(178, 156, 3, 22, '#fff');
+        drawRect(153, 154, 28, 3, '#6c4');
     });
     for (let i = 0; i < 9; i++) {
-        R(154 + i * 3, 153 + (i % 2), 2, 2, ['#f6a', '#fff', '#fd3'][i % 3]);
+        drawRect(154 + i * 3, 153 + (i % 2), 2, 2, ['#f6a', '#fff', '#fd3'][i % 3]);
     }
-    g.globalAlpha = 1;
+    ctx.globalAlpha = 1;
 }
 // Draws the Horrible-Harry-inspired events (ants, slime, mud gremlins, ghost)
 // Draws the Horrible-Harry-inspired events (ant march, green slime, mud gremlins, Halloween ghost)
 function drawNewEvents(e, t) {
     const fade = Math.min(1, t / 2, (e.d - t) / 2);
+    if (EXTRA_EVENTS[e.k] && EXTRA_EVENTS[e.k].draw) {
+        EXTRA_EVENTS[e.k].draw(e, t, fade);
+    }
     if (e.k === 'ants') {
         const route = [[330, 97], [79, 97], [79, 86], [79, 66]];
         for (let i = 0; i < 46; i++) {
-            const p = along(route, t * 26 - i * 5);
+            const p = pointAlongPath(route, t * 26 - i * 5);
             if (!p) {
                 continue;
             }
-            R(p[0], p[1], 3, 2, '#1a1a1a');
-            R(p[0] + Math.floor(T * 8 + i) % 2, p[1] + 2, 1, 1, '#1a1a1a');
+            drawRect(p[0], p[1], 3, 2, '#1a1a1a');
+            drawRect(p[0] + Math.floor(clock * 8 + i) % 2, p[1] + 2, 1, 1, '#1a1a1a');
         }
     }
     if (e.k === 'slime' || e.k === 'mud') {
         const slime = e.k === 'slime';
-        g.globalAlpha = fade;
+        ctx.globalAlpha = fade;
         (slime ? SLIME_PTS : MUD_PTS).forEach((p, i) => {
             const h = Math.abs(Math.sin(t * 2.5 + i * 1.3));
             const x = p[0] + (slime ? Math.sin(t * .7 + i) * 8 : 0);
             const y = p[1] - h * 3;
-            E(x + 2, p[1] + 1, 5, 2, 'rgba(0,0,0,.25)');
+            fillEllipse(x + 2, p[1] + 1, 5, 2, 'rgba(0,0,0,.25)');
             if (slime) {
-                OL(() => {
-                    R(x - 4, y - 2, 9, 2, '#6fe05a');
-                    R(x - 3, y - 4, 7, 2, '#6fe05a');
-                    R(x - 2, y - 5, 5, 1, '#9cf08c');
-                    R(x - 2, y - 3, 1, 1, '#222');
-                    R(x + 1, y - 3, 1, 1, '#222');
+                drawOutlined(() => {
+                    drawRect(x - 4, y - 2, 9, 2, '#6fe05a');
+                    drawRect(x - 3, y - 4, 7, 2, '#6fe05a');
+                    drawRect(x - 2, y - 5, 5, 1, '#9cf08c');
+                    drawRect(x - 2, y - 3, 1, 1, '#222');
+                    drawRect(x + 1, y - 3, 1, 1, '#222');
                 });
             }
             else {
-                OL(() => {
-                    R(x - 3, y - 6, 6, 6, '#5a3a1e');
-                    R(x - 3, y - 8, 1, 2, '#5a3a1e');
-                    R(x + 2, y - 8, 1, 2, '#5a3a1e');
-                    R(x - 2, y - 5, 1, 1, '#f33');
-                    R(x + 1, y - 5, 1, 1, '#f33');
+                drawOutlined(() => {
+                    drawRect(x - 3, y - 6, 6, 6, '#5a3a1e');
+                    drawRect(x - 3, y - 8, 1, 2, '#5a3a1e');
+                    drawRect(x + 2, y - 8, 1, 2, '#5a3a1e');
+                    drawRect(x - 2, y - 5, 1, 1, '#f33');
+                    drawRect(x + 1, y - 5, 1, 1, '#f33');
                 });
             }
         });
-        g.globalAlpha = 1;
+        ctx.globalAlpha = 1;
     }
     if (e.k === 'ghost') {
-        g.globalAlpha = fade * .25;
-        R(0, 0, W, H, '#140030');
-        g.globalAlpha = fade * .9;
-        const x = -20 + t / e.d * (W + 40);
+        ctx.globalAlpha = fade * .25;
+        drawRect(0, 0, WIDTH, HEIGHT, '#140030');
+        ctx.globalAlpha = fade * .9;
+        const x = -20 + t / e.d * (WIDTH + 40);
         const y = 70 + Math.sin(t * 1.7) * 18;
-        OL(() => {
-            R(x - 5, y - 10, 10, 10, '#fff');
-            R(x - 6, y - 6, 12, 8, '#fff');
+        drawOutlined(() => {
+            drawRect(x - 5, y - 10, 10, 10, '#fff');
+            drawRect(x - 6, y - 6, 12, 8, '#fff');
             for (let i = 0; i < 4; i++) {
-                R(x - 6 + i * 3, y + 2, 3, 2 + (i % 2), '#fff');
+                drawRect(x - 6 + i * 3, y + 2, 3, 2 + (i % 2), '#fff');
             }
-            R(x - 3, y - 7, 2, 3, '#222');
-            R(x + 1, y - 7, 2, 3, '#222');
-            R(x - 1, y - 3, 2, 2, '#222');
+            drawRect(x - 3, y - 7, 2, 3, '#222');
+            drawRect(x + 1, y - 7, 2, 3, '#222');
+            drawRect(x - 1, y - 3, 2, 2, '#222');
         });
-        g.globalAlpha = 1;
+        ctx.globalAlpha = 1;
     }
 }
 /* ---------- drawing characters ---------- */
 // Draw a character with an outline (dch0 draws the sprite itself)
-function dch(c) {
-    OL(() => dch0(c));
+function drawCharacter(c) {
+    drawOutlined(() => drawCharacterSprite(c));
 }
-function dch0(c) {
+function drawCharacterSprite(c) {
     const x = Math.round(c.x + c.jx);
     const y = Math.round(c.y);
-    const a = A[c.act];
+    const a = ACTIVITIES[c.act];
     const sit = c.s === 'act' && a && a.sit && !c.tc;
     const fl = c.s === 'flee';
     const mvg = c.s === 'go' || fl;
     const sc = c.s === 'freeze' || fl;
-    E(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
-    let b = mvg ? (Math.abs(Math.sin(c.ph)) * (fl ? 2 : 1)) | 0 : (c.s === 'act' && !sit && Math.sin(T * 4 + c.id) > .6 ? 1 : 0);
+    fillEllipse(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
+    let b = mvg ? (Math.abs(Math.sin(c.ph)) * (fl ? 2 : 1)) | 0 : (c.s === 'act' && !sit && Math.sin(clock * 4 + c.id) > .6 ? 1 : 0);
+    if (c.an) {
+        drawAnimal(c, x, y, b);
+        return;
+    }
     if (c.tc) {
-        R(x - 3, y - 9 - b, 7, 9, c.rb);
-        R(x - 3, y - 2 - b, 7, 1, 'rgba(0,0,0,.25)');
-        R(x, y - 8 - b, 1, 6, '#ffe066');
-        R(x - 4, y - 8 - b, 1, 4, c.rb);
-        R(x + 4, y - 8 - b, 1, 4, c.rb);
-        R(x - 2, y - 13 - b, 5, 4, c.sk);
-        R(x - 1, y - 12 - b, 1, 1, '#222');
-        R(x + 1, y - 12 - b, 1, 1, '#222');
-        R(x - 2, y - 10 - b, 5, 2, '#e8e0d0');
-        R(x - 4, y - 14 - b, 9, 1, '#3a2a6a');
-        R(x - 3, y - 16 - b, 7, 2, '#3a2a6a');
-        R(x - 2, y - 18 - b, 5, 2, '#3a2a6a');
-        R(x - 1, y - 20 - b, 3, 2, '#3a2a6a');
-        R(x + 1, y - 18 - b, 1, 1, '#ffe066');
+        drawRect(x - 3, y - 9 - b, 7, 9, c.rb);
+        drawRect(x - 3, y - 2 - b, 7, 1, 'rgba(0,0,0,.25)');
+        drawRect(x, y - 8 - b, 1, 6, '#ffe066');
+        drawRect(x - 4, y - 8 - b, 1, 4, c.rb);
+        drawRect(x + 4, y - 8 - b, 1, 4, c.rb);
+        drawRect(x - 2, y - 13 - b, 5, 4, c.sk);
+        drawRect(x - 1, y - 12 - b, 1, 1, '#222');
+        drawRect(x + 1, y - 12 - b, 1, 1, '#222');
+        drawRect(x - 2, y - 10 - b, 5, 2, '#e8e0d0');
+        drawRect(x - 4, y - 14 - b, 9, 1, '#3a2a6a');
+        drawRect(x - 3, y - 16 - b, 7, 2, '#3a2a6a');
+        drawRect(x - 2, y - 18 - b, 5, 2, '#3a2a6a');
+        drawRect(x - 1, y - 20 - b, 3, 2, '#3a2a6a');
+        drawRect(x + 1, y - 18 - b, 1, 1, '#ffe066');
         if (c.tn === 1) {
-            R(x - 2, y - 12 - b, 5, 1, 'rgba(255,255,255,.5)');
+            drawRect(x - 2, y - 12 - b, 5, 1, 'rgba(255,255,255,.5)');
+        }
+        if (c.cos) {
+            drawCostume(c, x, y - 13 - b);
         }
         return;
     }
     const o = sit ? 2 : 0;
     if (!sit) {
         const l = mvg && Math.sin(c.ph) > 0;
-        R(x - 2, y - 2 - (l ? 1 : 0), 2, 2, '#2a2438');
-        R(x + 1, y - 2 - (mvg && !l ? 1 : 0), 2, 2, '#2a2438');
+        drawRect(x - 2, y - 2 - (l ? 1 : 0), 2, 2, '#2a2438');
+        drawRect(x + 1, y - 2 - (mvg && !l ? 1 : 0), 2, 2, '#2a2438');
     }
-    R(x - 3, y - 6 - b + o, 6, 4, c.rb);
-    R(x - 3, y - 3 - b + o, 6, 1, 'rgba(0,0,0,.22)');
+    drawRect(x - 3, y - 6 - b + o, 6, 4, c.rb);
+    drawRect(x - 3, y - 3 - b + o, 6, 1, 'rgba(0,0,0,.22)');
     const ay = sc ? y - 10 - b : y - 6 - b + o;
-    R(x - 4, ay, 1, 3, c.rb);
-    R(x + 3, ay, 1, 3, c.rb);
-    R(x - 4, ay - (sc ? 1 : -3), 1, 1, c.sk);
-    R(x + 3, ay - (sc ? 1 : -3), 1, 1, c.sk);
-    R(x - 2, y - 9 - b + o, 5, 3, c.sk);
+    drawRect(x - 4, ay, 1, 3, c.rb);
+    drawRect(x + 3, ay, 1, 3, c.rb);
+    drawRect(x - 4, ay - (sc ? 1 : -3), 1, 1, c.sk);
+    drawRect(x + 3, ay - (sc ? 1 : -3), 1, 1, c.sk);
+    drawRect(x - 2, y - 9 - b + o, 5, 3, c.sk);
     if (sc) {
-        R(x - 2, y - 9 - b + o, 1, 2, '#fff');
-        R(x + 2, y - 9 - b + o, 1, 2, '#fff');
-        R(x - 1, y - 8 - b + o, 1, 1, '#222');
-        R(x + 1, y - 8 - b + o, 1, 1, '#222');
-        R(x, y - 7 - b + o, 1, 1, '#a33');
+        drawRect(x - 2, y - 9 - b + o, 1, 2, '#fff');
+        drawRect(x + 2, y - 9 - b + o, 1, 2, '#fff');
+        drawRect(x - 1, y - 8 - b + o, 1, 1, '#222');
+        drawRect(x + 1, y - 8 - b + o, 1, 1, '#222');
+        drawRect(x, y - 7 - b + o, 1, 1, '#a33');
     }
     else {
-        R(x - 1, y - 8 - b + o, 1, 1, '#222');
-        R(x + 1, y - 8 - b + o, 1, 1, '#222');
+        drawRect(x - 1, y - 8 - b + o, 1, 1, '#222');
+        drawRect(x + 1, y - 8 - b + o, 1, 1, '#222');
     }
     if (c.gl) {
-        R(x - 2, y - 9 - b + o, 2, 2, '#222');
-        R(x + 1, y - 9 - b + o, 2, 2, '#222');
-        R(x - 1, y - 8 - b + o, 1, 1, '#9ad4ff');
-        R(x + 1, y - 8 - b + o, 1, 1, '#9ad4ff');
+        drawRect(x - 2, y - 9 - b + o, 2, 2, '#222');
+        drawRect(x + 1, y - 9 - b + o, 2, 2, '#222');
+        drawRect(x - 1, y - 8 - b + o, 1, 1, '#9ad4ff');
+        drawRect(x + 1, y - 8 - b + o, 1, 1, '#9ad4ff');
     }
     if (c.ht) {
-        R(x - 3, y - 11 - b + o, 7, 1, c.hc);
-        R(x - 2, y - 12 - b + o, 5, 2, c.hc);
-        R(x - 1, y - 14 - b + o, 3, 2, c.hc);
+        drawRect(x - 3, y - 11 - b + o, 7, 1, c.hc);
+        drawRect(x - 2, y - 12 - b + o, 5, 2, c.hc);
+        drawRect(x - 1, y - 14 - b + o, 3, 2, c.hc);
     }
     else {
-        R(x - 2, y - 10 - b + o, 5, 1, c.hr);
-        R(x - 3, y - 9 - b + o, 1, 2, c.hr);
-        R(x + 3, y - 9 - b + o, 1, 2, c.hr);
+        drawRect(x - 2, y - 10 - b + o, 5, 1, c.hr);
+        drawRect(x - 3, y - 9 - b + o, 1, 2, c.hr);
+        drawRect(x + 3, y - 9 - b + o, 1, 2, c.hr);
+    }
+    if (c.cos) {
+        drawCostume(c, x, y - 9 - b + o);
     }
     if (c.item && c.s !== 'freeze') {
         item(c.item, x + 3, y - 3 - b + o);
@@ -1274,209 +1810,213 @@ function dch0(c) {
 }
 /* ---------- main draw ---------- */
 // Draws everything that changes and sits on the ground: blackboard, posters, plants, pond life, ball, dropped items
-function dyn() {
-    if (ev && ev.k === 'wedding') {
-        arch();
+function drawMovingScenery() {
+    drawAnimatedScenery();
+    if (currentEvent && EXTRA_EVENTS[currentEvent.k] && EXTRA_EVENTS[currentEvent.k].ground) {
+        EXTRA_EVENTS[currentEvent.k].ground(currentEvent);
     }
-    A.class.o.forEach((o, i) => {
+    if (currentEvent && currentEvent.k === 'wedding') {
+        drawWeddingArch();
+    }
+    ACTIVITIES.class.o.forEach((o, i) => {
         if (o) {
-            R([34, 58, 82, 106][i % 4] + 4, (i < 4 ? 44 : 62) + 1, 5, 3, '#fff');
+            drawRect([34, 58, 82, 106][i % 4] + 4, (i < 4 ? 44 : 62) + 1, 5, 3, '#fff');
         }
     });
     // class back wall
-    ob(55, 16, 42, 13);
-    R(55, 16, 42, 13, '#7a5230');
-    R(56, 17, 40, 11, '#2f4a3a');
-    const k = Math.floor(T / 8);
+    drawRectOutline(55, 16, 42, 13);
+    drawRect(55, 16, 42, 13, '#7a5230');
+    drawRect(56, 17, 40, 11, '#2f4a3a');
+    const k = Math.floor(clock / 8);
     for (let i = 0; i < 4; i++) {
-        R(59, 19 + i * 2, 8 + ((Math.sin(k * 13 + i * 5) * .5 + .5) * 24 | 0), 1, '#e8f0e0');
+        drawRect(59, 19 + i * 2, 8 + ((Math.sin(k * 13 + i * 5) * .5 + .5) * 24 | 0), 1, '#e8f0e0');
     }
-    const n = Math.min(10, Math.floor(deco));
-    if (deco >= 11) {
-        deco = 2;
+    const n = Math.min(10, Math.floor(decorationProgress));
+    if (decorationProgress >= 11) {
+        decorationProgress = 2;
     }
     for (let i = 0; i < n; i++) {
         if (i < 4) {
             const x = [44, 50, 100, 106][i];
-            R(x, 19, 5, 6, ['#ff7ab8', '#ffe066', '#8fd', '#c8f'][i]);
-            R(x + 1, 20, 3, 1, '#fff');
+            drawRect(x, 19, 5, 6, ['#ff7ab8', '#ffe066', '#8fd', '#c8f'][i]);
+            drawRect(x + 1, 20, 3, 1, '#fff');
         }
         else {
             const x = 24 + (i - 4) * 16;
             for (let j = 0; j < 6; j++) {
-                R(x + j * 2, 34 + (j % 2), 2, 2, ['#e33', '#fd3', '#39f', '#3a3', '#f6a', '#85f'][(i + j) % 6]);
+                drawRect(x + j * 2, 34 + (j % 2), 2, 2, ['#e33', '#fd3', '#39f', '#3a3', '#f6a', '#85f'][(i + j) % 6]);
             }
         }
     }
     // stage back
-    const sk = Math.floor(T / 12) % 3;
-    R(206, 15, 88, 15, ['#2c2a5e', '#5e2c4a', '#2c5e4a'][sk]);
-    E(250, 21, 4, 4, '#ffe9a8');
-    R(214, 22, 8, 8, '#1a1a3a');
-    R(216, 20, 4, 2, '#1a1a3a');
-    R(278, 24, 10, 6, '#1a1a3a');
+    const sk = Math.floor(clock / 12) % 3;
+    drawRect(206, 15, 88, 15, ['#2c2a5e', '#5e2c4a', '#2c5e4a'][sk]);
+    fillEllipse(250, 21, 4, 4, '#ffe9a8');
+    drawRect(214, 22, 8, 8, '#1a1a3a');
+    drawRect(216, 20, 4, 2, '#1a1a3a');
+    drawRect(278, 24, 10, 6, '#1a1a3a');
     for (let i = 0; i < 6; i++) {
-        R(212 + i * 14, 17 + (i * 5) % 7, 1, 1, '#fff');
+        drawRect(212 + i * 14, 17 + (i * 5) % 7, 1, 1, '#fff');
     }
-    A.theater.o.forEach((o, i) => {
+    ACTIVITIES.theater.o.forEach((o, i) => {
         if (o && i < 5) {
-            E(A.theater.s[i][0], A.theater.s[i][1], 9, 4, 'rgba(255,240,170,.2)');
+            fillEllipse(ACTIVITIES.theater.s[i][0], ACTIVITIES.theater.s[i][1], 9, 4, 'rgba(255,240,170,.2)');
         }
     });
     // easel
-    R(159, 104, 26, 13, '#8a6a40');
-    R(160, 105, 24, 11, '#f1efe6');
-    const q = Math.floor(T / 7) % 3;
+    drawRect(159, 104, 26, 13, '#8a6a40');
+    drawRect(160, 105, 24, 11, '#f1efe6');
+    const q = Math.floor(clock / 7) % 3;
     if (q === 0) {
-        E(172, 110, 4, 4, '#e55');
+        fillEllipse(172, 110, 4, 4, '#e55');
     }
     else if (q === 1) {
         for (let j = 0; j < 7; j++) {
-            R(172 - j / 2, 106 + j, 1 + j, 1, '#39c');
+            drawRect(172 - j / 2, 106 + j, 1 + j, 1, '#39c');
         }
     }
     else {
-        R(168, 106, 8, 8, '#3a3');
+        drawRect(168, 106, 8, 8, '#3a3');
     }
     // magic circle
-    const gl = Math.min(1, mg / 60);
-    mg = 0;
+    const gl = Math.min(1, casterCount / 60);
+    casterCount = 0;
     for (let a = 0; a < 6.283; a += .12) {
-        R(165 + Math.cos(a + T * .5) * 24, 56 + Math.sin(a + T * .5) * 10.5, 1, 1, `rgba(${gl > 0 ? '190,150,255' : '120,120,150'},${.4 + .6 * gl})`);
+        drawRect(165 + Math.cos(a + clock * .5) * 24, 56 + Math.sin(a + clock * .5) * 10.5, 1, 1, `rgba(${gl > 0 ? '190,150,255' : '120,120,150'},${.4 + .6 * gl})`);
     }
     if (gl > 0) {
-        E(165, 56, 7, 3, `rgba(190,150,255,${.25 + .5 * gl})`);
+        fillEllipse(165, 56, 7, 3, `rgba(190,150,255,${.25 + .5 * gl})`);
     }
     // plants
     plants.forEach((p, i) => {
         const px = [25, 52, 79][i % 3];
         const py = [116, 140][i / 3 | 0];
-        R(px, py, 22, 14, '#7a4a2a');
-        R(px, py + 4, 22, 1, '#5e3720');
-        R(px, py + 9, 22, 1, '#5e3720');
-        R(px, py + 14, 22, 1, 'rgba(0,0,0,.2)');
-        const bm = ev && ev.k === 'bloom' ? 2 : 0;
+        drawRect(px, py, 22, 14, '#7a4a2a');
+        drawRect(px, py + 4, 22, 1, '#5e3720');
+        drawRect(px, py + 9, 22, 1, '#5e3720');
+        drawRect(px, py + 14, 22, 1, 'rgba(0,0,0,.2)');
+        const bm = currentEvent && currentEvent.k === 'bloom' ? 2 : 0;
         for (let j = 0; j < 3; j++) {
             const sx = px + 4 + j * 7;
             const h = 1 + Math.round(p.g * 5) + bm;
-            R(sx, py + 12 - h, 1, h, '#3a9a3a');
-            R(sx - 1, py + 12 - (h >> 1), 1, 1, '#4ab84a');
-            R(sx + 1, py + 11 - (h >> 1), 1, 1, '#4ab84a');
+            drawRect(sx, py + 12 - h, 1, h, '#3a9a3a');
+            drawRect(sx - 1, py + 12 - (h >> 1), 1, 1, '#4ab84a');
+            drawRect(sx + 1, py + 11 - (h >> 1), 1, 1, '#4ab84a');
             if (p.g > .55 || bm) {
                 const cc = ['#ff5a8a', '#ffd84a', '#c58cff', '#fff', '#ff9a3a', '#6ef'][(i + j) % 6];
-                R(sx - 1, py + 10 - h, 3, 3, cc);
-                R(sx, py + 11 - h, 1, 1, '#ffd84a');
+                drawRect(sx - 1, py + 10 - h, 3, 3, cc);
+                drawRect(sx, py + 11 - h, 1, 1, '#ffd84a');
             }
         }
     });
     // pond
     for (let i = 0; i < 3; i++) {
-        R(255 + Math.sin(T * .8 + i * 2) * 8, 140 + i * 5 - 5, 5, 1, 'rgba(255,255,255,.35)');
+        drawRect(255 + Math.sin(clock * .8 + i * 2) * 8, 140 + i * 5 - 5, 5, 1, 'rgba(255,255,255,.35)');
     }
     fish.forEach(f => {
         f.a += .012;
-        R(265 + Math.cos(f.a) * 18, 140 + Math.sin(f.a) * 9, 3, 2, 'rgba(255,154,58,.8)');
+        drawRect(265 + Math.cos(f.a) * 18, 140 + Math.sin(f.a) * 9, 3, 2, 'rgba(255,154,58,.8)');
     });
-    const oc = A.pond.o.map((o, i) => o ? A.pond.s[i] : null).filter(Boolean);
+    const oc = ACTIVITIES.pond.o.map((o, i) => o ? ACTIVITIES.pond.s[i] : null).filter(Boolean);
     ducks.forEach((d, i) => {
         if (Math.random() < .01) {
-            const p = oc.length ? pick(oc) : null;
-            d.tx = p ? 265 + (p[0] - 265) * .7 : rnd(245, 285);
-            d.ty = p ? 140 + (p[1] - 140) * .7 : rnd(130, 152);
+            const p = oc.length ? pickOne(oc) : null;
+            d.tx = p ? 265 + (p[0] - 265) * .7 : randomBetween(245, 285);
+            d.ty = p ? 140 + (p[1] - 140) * .7 : randomBetween(130, 152);
         }
         d.x += (d.tx - d.x) * .01;
         d.y += (d.ty - d.y) * .01;
-        OL(() => {
-            R(d.x - 2, d.y - 1, 5, 3, '#fff');
-            R(d.x + 2, d.y - 3, 2, 2, '#2a8a2a');
-            R(d.x + 4, d.y - 2, 1, 1, '#f90');
+        drawOutlined(() => {
+            drawRect(d.x - 2, d.y - 1, 5, 3, '#fff');
+            drawRect(d.x + 2, d.y - 3, 2, 2, '#2a8a2a');
+            drawRect(d.x + 4, d.y - 2, 1, 1, '#f90');
         });
     });
     // ball
-    const bo = A.ball.o.map((o, i) => o ? A.ball.s[i] : null).filter(Boolean);
+    const bo = ACTIVITIES.ball.o.map((o, i) => o ? ACTIVITIES.ball.s[i] : null).filter(Boolean);
     if (bo.length > 1) {
-        bl.t += .018;
-        if (bl.t >= 1) {
-            bl.t = 0;
-            bl.a = bl.b;
-            bl.b = pick(bo);
+        kickball.t += .018;
+        if (kickball.t >= 1) {
+            kickball.t = 0;
+            kickball.a = kickball.b;
+            kickball.b = pickOne(bo);
         }
-        const t = bl.t;
-        const bx = bl.a[0] + (bl.b[0] - bl.a[0]) * t;
-        const by = bl.a[1] + (bl.b[1] - bl.a[1]) * t - 6 - Math.sin(t * 3.14) * 8;
-        E(bx, bl.a[1] + (bl.b[1] - bl.a[1]) * t, 2, 1, 'rgba(0,0,0,.3)');
-        R(bx - 1, by - 1, 3, 3, '#fff');
-        R(bx, by, 1, 1, '#e33');
+        const t = kickball.t;
+        const bx = kickball.a[0] + (kickball.b[0] - kickball.a[0]) * t;
+        const by = kickball.a[1] + (kickball.b[1] - kickball.a[1]) * t - 6 - Math.sin(t * 3.14) * 8;
+        fillEllipse(bx, kickball.a[1] + (kickball.b[1] - kickball.a[1]) * t, 2, 1, 'rgba(0,0,0,.3)');
+        drawRect(bx - 1, by - 1, 3, 3, '#fff');
+        drawRect(bx, by, 1, 1, '#e33');
     }
     // dropped items
-    for (let i = D.length - 1; i >= 0; i--) {
-        const d = D[i];
+    for (let i = droppedItems.length - 1; i >= 0; i--) {
+        const d = droppedItems[i];
         d.t -= .016;
         if (d.t <= 0) {
-            D.splice(i, 1);
+            droppedItems.splice(i, 1);
             continue;
         }
-        g.globalAlpha = Math.min(1, d.t / 2);
+        ctx.globalAlpha = Math.min(1, d.t / 2);
         item(d.it, d.x - 1, d.y - 2);
-        g.globalAlpha = 1;
+        ctx.globalAlpha = 1;
     }
 }
 // Draws things on top of characters: names, emoji bubbles, particles, event pictures, red warning tint
-function over() {
+function drawOverlay() {
     drawNames();
-    cs.forEach(c => {
+    people.forEach(c => {
         if (c.s === 'away' || !c.em) {
             return;
         }
         const e = c.em;
         const rise = Math.min(3, (e.m - e.t) * 6) | 0;
-        g.globalAlpha = e.t < .3 ? e.t / .3 : 1;
+        ctx.globalAlpha = e.t < .3 ? e.t / .3 : 1;
         bubble(Math.round(c.x + c.jx) - 3, Math.round(c.y) - (c.tc ? 31 : 25) - rise, e.i);
-        g.globalAlpha = 1;
+        ctx.globalAlpha = 1;
     });
-    for (let i = P.length - 1; i >= 0; i--) {
-        const p = P[i];
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
         p.t -= .016;
         if (p.t <= 0) {
-            P.splice(i, 1);
+            particles.splice(i, 1);
             continue;
         }
         p.vy += p.g * .016;
         p.x += p.vx * .016;
         p.y += p.vy * .016;
-        g.globalAlpha = Math.min(1, p.t / p.m * 1.5);
-        R(p.x, p.y, 1, 1, p.c);
-        g.globalAlpha = 1;
+        ctx.globalAlpha = Math.min(1, p.t / p.m * 1.5);
+        drawRect(p.x, p.y, p.s || 1, p.s || 1, p.c);
+        ctx.globalAlpha = 1;
     }
-    if (ev) {
-        const e = ev;
+    if (currentEvent) {
+        const e = currentEvent;
         const t = e.t;
         drawNewEvents(e, t);
         if (e.k === 'rainbow') {
-            g.globalAlpha = Math.min(1, t / 2, (e.d - t) / 3) * .5;
+            ctx.globalAlpha = Math.min(1, t / 2, (e.d - t) / 3) * .5;
             ['#e33', '#f90', '#fd3', '#3b3', '#39f', '#46c', '#a5d'].forEach((c, i) => {
                 for (let a = 3.1416; a < 6.3; a += .004) {
-                    R(160 + Math.cos(a) * (150 - i * 3), 104 + Math.sin(a) * (82 - i * 2), 2, 2, c);
+                    drawRect(160 + Math.cos(a) * (150 - i * 3), 104 + Math.sin(a) * (82 - i * 2), 2, 2, c);
                 }
             });
-            g.globalAlpha = 1;
+            ctx.globalAlpha = 1;
         }
         if (e.k === 'dragon') {
             const p = t / e.d;
-            const x = -30 + p * (W + 60);
+            const x = -30 + p * (WIDTH + 60);
             const y = 26 + p * 90 + Math.sin(p * 9) * 6;
             const f = Math.sin(t * 9) * 3 | 0;
             const dr = (x, y, c, w) => {
-                R(x, y, 14, 4, c);
-                R(x + 14, y - 1, 5, 4, c);
-                R(x - 9, y + 1, 9, 2, c);
-                R(x - 12, y, 3, 2, c);
-                R(x + 3, y - 5 - f, 6, 5, w);
-                R(x + 3, y + 4 + f, 6, 4, w);
+                drawRect(x, y, 14, 4, c);
+                drawRect(x + 14, y - 1, 5, 4, c);
+                drawRect(x - 9, y + 1, 9, 2, c);
+                drawRect(x - 12, y, 3, 2, c);
+                drawRect(x + 3, y - 5 - f, 6, 5, w);
+                drawRect(x + 3, y + 4 + f, 6, 4, w);
             };
             dr(x + 14, y + 46, 'rgba(0,0,30,.28)', 'rgba(0,0,30,.28)');
             dr(x, y, '#7a45b8', '#b68cff');
-            R(x + 17, y, 1, 1, '#fff');
+            drawRect(x + 17, y, 1, 1, '#fff');
         }
         if (e.k === 'owl' && e.tg) {
             const c = e.tg;
@@ -1486,7 +2026,7 @@ function over() {
             let y;
             if (t < 5) {
                 const p = t / 5;
-                x = W + 20 + (tx - W - 20) * p;
+                x = WIDTH + 20 + (tx - WIDTH - 20) * p;
                 y = -10 + (ty + 10) * p;
             }
             else if (t < 8) {
@@ -1494,7 +2034,7 @@ function over() {
                 y = ty + Math.sin(t * 6) * 1.5;
                 if (!e.got) {
                     e.got = 1;
-                    setEm(c, 'star', 3);
+                    showEmoji(c, 'star', 3);
                 }
             }
             else {
@@ -1503,128 +2043,134 @@ function over() {
                 y = ty - (ty + 10) * p;
             }
             const fl = Math.sin(t * 20) > 0 ? 1 : -1;
-            E(x + 2, y + 26, 4, 2, 'rgba(0,0,30,.25)');
-            R(x - 2, y, 5, 5, '#8b5a2b');
-            R(x - 1, y + 1, 1, 1, '#fff');
-            R(x + 1, y + 1, 1, 1, '#fff');
-            R(x, y + 2, 1, 1, '#f90');
-            R(x - 5, y + 1 + fl, 3, 3, '#a06a38');
-            R(x + 3, y + 1 - fl, 3, 3, '#a06a38');
+            fillEllipse(x + 2, y + 26, 4, 2, 'rgba(0,0,30,.25)');
+            drawRect(x - 2, y, 5, 5, '#8b5a2b');
+            drawRect(x - 1, y + 1, 1, 1, '#fff');
+            drawRect(x + 1, y + 1, 1, 1, '#fff');
+            drawRect(x, y + 2, 1, 1, '#f90');
+            drawRect(x - 5, y + 1 + fl, 3, 3, '#a06a38');
+            drawRect(x + 3, y + 1 - fl, 3, 3, '#a06a38');
             if (t < 8) {
-                R(x - 1, y + 5, 4, 3, '#fff');
-                R(x, y + 6, 1, 1, '#e44');
+                drawRect(x - 1, y + 5, 4, 3, '#fff');
+                drawRect(x, y + 6, 1, 1, '#e44');
             }
         }
     }
     // clouds / tints
-    if (mode === 'warn') {
-        R(0, 0, W, H, `rgba(60,20,0,${.16 + .08 * Math.sin(T * 10)})`);
+    if (noiseMode === 'warn') {
+        drawRect(0, 0, WIDTH, HEIGHT, `rgba(60,20,0,${.16 + .08 * Math.sin(clock * 10)})`);
     }
-    if (mode === 'flee') {
-        R(0, 0, W, H, `rgba(90,0,0,${.2 + .08 * Math.sin(T * 14)})`);
+    if (noiseMode === 'flee') {
+        drawRect(0, 0, WIDTH, HEIGHT, `rgba(90,0,0,${.2 + .08 * Math.sin(clock * 14)})`);
     }
 }
 // One full frame: background, ground objects, characters sorted by height (so lower ones are in front), overlays
-function draw() {
-    g.drawImage(bgc, 0, 0);
-    [[T * 3, 50], [T * 2 + 150, 140]].forEach(([x, y]) => E(x % (W + 160) - 60, y, 45, 13, 'rgba(0,25,0,.09)'));
-    dyn();
+function drawFrame() {
+    ctx.drawImage(backgroundCanvas, 0, 0);
+    [[clock * 3, 50], [clock * 2 + 150, 140]].forEach(([x, y]) => fillEllipse(x % (WIDTH + 160) - 60, y, 45, 13, 'rgba(0,25,0,.09)'));
+    drawMovingScenery();
     const L = [];
-    cs.forEach(c => {
-        if (c.s !== 'away') {
-            L.push([c.y, () => dch(c)]);
+    people.forEach(c => {
+        if (c.s !== 'away' && !c.hid) {
+            L.push([c.y, () => drawCharacter(c)]);
         }
     });
-    TR.forEach(t => L.push([t[1], () => tree(t[0], t[1])]));
-    L.push([90, fwall]);
+    TREES.forEach(t => L.push([t[1], () => drawTree(t[0], t[1])]));
+    L.push([90, drawClassroomFront]);
     L.sort((a, b) => a[0] - b[0]);
     L.forEach(o => o[1]());
-    over();
+    drawOverlay();
 }
+// ---- First-time setup: load saved settings, build the settings window, build the scenery ----
+loadConfig();
+buildSettingsUI();
+applyConfig();
+
 // ---- MAIN LOOP: update noise level, mode, events and characters, then draw and refresh the banner/meter ----
-let last = performance.now();
-let bt = '';
-let bc = '';
-let inf = '';
-function frame(now) {
-    const dt = Math.min(.05, (now - last) / 1000);
-    last = now;
-    T += dt;
-    const r = raw();
-    const th = +sl.value;
-    lvl = r > lvl ? r : Math.max(r, lvl - 28 * dt);
-    if (lvl >= th) {
-        if (mode !== 'flee') {
-            mode = 'flee';
+let lastFrameTime = performance.now();
+let bannerText = '';
+let bannerClass = '';
+let infoText = '';
+function gameLoop(now) {
+    const dt = Math.min(.05, (now - lastFrameTime) / 1000);
+    lastFrameTime = now;
+    clock += dt;
+    const r = readNoiseLevel();
+    const th = +limitSlider.value;
+    noiseLevel = r > noiseLevel ? r : Math.max(r, noiseLevel - 28 * dt);
+    if (noiseLevel >= th) {
+        if (noiseMode !== 'flee') {
+            noiseMode = 'flee';
             onFlee();
         }
-        calmT = 0;
-        quietT = 0;
-        evT = 0;
+        calmTime = 0;
+        quietTime = 0;
+        eventTimer = 0;
     }
-    else if (mode === 'flee') {
-        if (lvl < th * .6) {
-            calmT += dt;
-            if (calmT > 3) {
-                mode = 'calm';
-                quietT = 0;
-                evT = 0;
-                sched();
+    else if (noiseMode === 'flee') {
+        if (noiseLevel < th * .6) {
+            calmTime += dt;
+            if (calmTime > 3) {
+                noiseMode = 'calm';
+                quietTime = 0;
+                eventTimer = 0;
+                scheduleReturns();
             }
         }
         else {
-            calmT = 0;
+            calmTime = 0;
         }
     }
-    else if (lvl >= th * .7) {
-        if (mode !== 'warn') {
-            mode = 'warn';
+    else if (noiseLevel >= th * .7) {
+        if (noiseMode !== 'warn') {
+            noiseMode = 'warn';
             onWarn();
         }
-        calmT = 0;
-        quietT = 0;
-        evT = 0;
+        calmTime = 0;
+        quietTime = 0;
+        eventTimer = 0;
     }
-    else if (mode === 'warn') {
-        calmT += dt;
-        if (calmT > 1.5) {
-            mode = 'calm';
+    else if (noiseMode === 'warn') {
+        calmTime += dt;
+        if (calmTime > 1.5) {
+            noiseMode = 'calm';
             onCalm();
         }
     }
-    const away = cs.filter(c => c.s === 'away' || c.s === 'flee').length;
-    if (mode === 'calm') {
-        quietT += dt;
-        if (!away && !ev) {
-            evT += dt;
-            if (evT >= nextEv) {
-                startEv(pick(Object.keys(EVT)));
+    const away = people.filter(c => !c.guest && (c.s === 'away' || c.s === 'flee')).length;
+    if (noiseMode === 'calm') {
+        quietTime += dt;
+        if (!away && !currentEvent) {
+            eventTimer += dt;
+            if (eventTimer >= nextEventAt) {
+                startEvent(chooseSpecialEvent());
             }
         }
     }
-    cs.forEach(c => updC(c, dt));
+    people.forEach(c => updateCharacter(c, dt));
     prankTimer(dt);
-    if (ev) {
-        evUp(dt);
+    updateVisitorsAndWeather(dt);
+    if (currentEvent) {
+        updateEvent(dt);
     }
-    if (Math.random() < dt * .3 && mode === 'calm') {
-        const p = cs.filter(c => c.s === 'idle' || c.s === 'act' || c.s === 'go');
-        const a = pick(p);
+    if (Math.random() < dt * .3 && noiseMode === 'calm') {
+        const p = people.filter(c => c.s === 'idle' || c.s === 'act' || c.s === 'go');
+        const a = pickOne(p);
         const b = p.find(o => o !== a && Math.hypot(o.x - a.x, o.y - a.y) < 18);
         if (b && !a.em && !b.em) {
-            const i = pick(['heart', 'smile', 'note', 'star']);
-            setEm(a, i, 1.6);
-            setEm(b, i, 1.6);
+            const i = pickOne(['heart', 'smile', 'note', 'star']);
+            showEmoji(a, i, 1.6);
+            showEmoji(b, i, 1.6);
         }
     }
-    draw();
+    drawFrame();
     let t = '';
     let c = '';
-    if (mode === 'flee') {
+    if (noiseMode === 'flee') {
         t = 'TOO LOUD.<br>EVERYONE IS RUNNING AWAY!';
         c = 'flee';
     }
-    else if (mode === 'warn') {
+    else if (noiseMode === 'warn') {
         t = 'NOISE WARNING!<br><small>Shh... please be quiet</small>';
         c = 'warn';
     }
@@ -1632,26 +2178,29 @@ function frame(now) {
         t = `Quiet now... everyone is coming back (${44 - away}/44)`;
         c = 'ok';
     }
-    else if (ev) {
-        t = ev.txt;
+    else if (currentEvent) {
+        t = currentEvent.txt;
         c = 'ev';
     }
-    if (t !== bt || c !== bc) {
-        bt = t;
-        bc = c;
-        $('bn').innerHTML = t;
-        $('bn').className = c;
+    if (t !== bannerText || c !== bannerClass) {
+        bannerText = t;
+        bannerClass = c;
+        byId('bn').innerHTML = t;
+        byId('bn').className = c;
     }
-    $('lv').style.width = Math.min(100, lvl) + '%';
-    $('mk').style.left = th + '%';
-    $('wk').style.left = th * .7 + '%';
-    const s = `Quiet ${Math.floor(quietT)}s  At school ${44 - away}/44`;
-    if (s !== inf) {
-        inf = s;
-        $('info').textContent = s;
+    byId('lv').style.width = Math.min(100, noiseLevel) + '%';
+    byId('mk').style.left = th + '%';
+    byId('wk').style.left = th * .7 + '%';
+    const s = `Quiet ${Math.floor(quietTime)}s  At school ${44 - away}/44`;
+    if (s !== infoText) {
+        infoText = s;
+        byId('info').textContent = s;
     }
-    requestAnimationFrame(frame);
+    requestAnimationFrame(gameLoop);
 }
-requestAnimationFrame(frame);
+requestAnimationFrame(gameLoop);
 
-</script></body></html>
+
+</script>
+</body>
+</html>
