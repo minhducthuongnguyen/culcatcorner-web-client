@@ -805,7 +805,8 @@ function applyConfig() {
   const h = settings.holidays;
   treeColors = h.includes('xmas') ? ['#0f3a24', '#1f6a3a', '#2f8a4a', '#185a30']
     : h.includes('thanks') ? ['#6a2f0d', '#d2691e', '#f0a030', '#a8501a']
-    : h.includes('halloween') ? ['#2a1a30', '#5a3a6a', '#7a5a8a', '#3a2a4a'] : TREE_DEFAULT;
+    : h.includes('halloween') ? ['#2a1a30', '#5a3a6a', '#7a5a8a', '#3a2a4a']
+    : h.includes('stpat') ? ['#0f4a1f', '#24a23c', '#4cd45c', '#1f8a35'] : TREE_DEFAULT;
   const hh = settings.series.includes('hh');
   const cast = [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [STUDENTS_MAX, 'Miss Mackle']];
   cast.forEach(([i, n]) => { people[i].name = hh ? n : null; });
@@ -834,6 +835,7 @@ function giveCostume(c) {
 }
 // x = centre, hy = y of the top of the head
 function drawCostume(c, x, hy) {
+  if (NEW_COSTUMES[c.cos]) { drawNewCostume(c, x, hy); return; }
   switch (c.cos) {
     case 'witch': drawRect(x - 4, hy - 1, 9, 1, '#222'); drawRect(x - 2, hy - 3, 5, 2, '#222'); drawRect(x - 1, hy - 6, 3, 3, '#222'); drawRect(x - 2, hy - 2, 5, 1, '#f90'); break;
     case 'cat': drawRect(x - 3, hy - 2, 2, 2, '#222'); drawRect(x + 2, hy - 2, 2, 2, '#222'); break;
@@ -1021,6 +1023,7 @@ function drawHolidayDecorations() {
 }
 function drawExtraScenery() {
   drawBookProps();
+  drawNewHolidayDecorations();
   drawHolidayStructures();
   // Christmas: remember which pixels are ground, so snow can pile up there later
   if (settings.holidays.includes('xmas')) buildSnowMask(); else snowThreshold = null;
@@ -1232,6 +1235,7 @@ addSpecialEvent('egghunt', { text: 'Easter egg hunt!', dur: 16, emo: ['star', 's
 /* ---------- Called every frame: visitors, purge, holiday weather ---------- */
 function updateVisitorsAndWeather(dt) {
   removeFinishedVisitors();
+  newHolidayWeather(dt);
   if (settings.holidays.includes('xmas')) snowCover = Math.min(1, snowCover + dt / SNOW_SECONDS);   // snow piles up
   if (noiseMode === 'calm') { visitCountdown -= dt; if (visitCountdown <= 0) { visitCountdown = randomBetween(35, 70); startVisit(); } }
   const h = id => settings.holidays.includes(id), drift = (c, s, vx, vy, y, t = 14) => particles.push({ x: randomBetween(0, WIDTH), y, vx, vy, t, m: t, c, g: 0, s });
@@ -2523,6 +2527,7 @@ function blockHolidayStructures() {
   blockRect(289, 182, 18, 13);                 // Snoopy's doghouse
   blockMagicStations();
   blockMoreHolidayStructures(h);
+  blockNewHolidayStructures(h);
   if (h === 'halloween') { blockRect(144, 18, 42, 15); [26, 38, 50, 62, 74, 86].forEach((x, i) => blockRect(x, 184 + (i % 2) * 2, 7, 5)); blockRect(89, 189, 7, 6); }
   if (h === 'thanks') { blockRect(144, 18, 44, 15); blockRect(56, 184, 4, 10); }
   if (h === 'xmas') { blockRect(144, 18, 44, 15); blockRect(44, 172, 28, 22); }
@@ -2535,6 +2540,7 @@ function drawHolidayStructures() {
   drawSnoopyHouse();
   drawMagicStations();
   drawMoreHolidayStructures(h);
+  drawNewHolidayStructures(h);
   if (h === 'halloween') { drawHauntedHouse(); drawGraveyard(); }
   if (h === 'thanks') { drawBarn(); drawCornfield(); }
   if (h === 'xmas') { drawWorkshop(); drawGiantTree(); drawFrozenPond(); }
@@ -2802,6 +2808,7 @@ function drawEggTree() {
 
 // Animated parts of the extra structures (called every frame from animateHolidayStructures)
 function animateMoreStructures(h) {
+  animateNewStructures(h);
   if (h === 'halloween') {
     for (let i = 0; i < 5; i++) drawRect(243 + i * 3.5, 191 - (Math.sin(clock * 9 + i * 2) > 0 ? 1 : 0), 2, 3, i % 2 ? '#ffd84a' : '#ff9a1a');   // fire
     if (Math.random() < .1) spawnParticle(250 + randomBetween(-5, 5), 181, '#9cff7a', -9, .9, 0, 2);                                            // bubbling brew
@@ -3217,6 +3224,303 @@ addSpecialEvent('potionBoom', { text: 'Potion class: BOOM! Rainbow smoke!', dur:
     const a = Math.min(1, (t - 3) / 1.5) * Math.min(1, (e.d - t) / 3) * .45;
     POTION_TABLES.forEach(([x, y, color], i) => { ctx.globalAlpha = a; fillEllipse(x + 7 + Math.sin(t + i) * 3, y - 6 - (t - 3) * 2, 12 + (t - 3), 7, color); ctx.globalAlpha = 1; });
   } });
+
+/* =====================================================================
+ * MORE HOLIDAYS: Lunar New Year, St. Patrick's Day, Earth Day,
+ * Independence Day (4th of July) and Diwali.
+ * Each one has its own costume, decorations, falling weather, three big
+ * structures (top-middle, bottom-left, bottom-right), a favourite activity
+ * near the structures, and two special events.
+ * ===================================================================== */
+HOLIDAYS.push(
+  { id: 'lunar', name: 'Lunar New Year', note: 'Lanterns, dragon dance, red envelopes', costumes: ['lunar'] },
+  { id: 'stpat', name: 'St. Patrick’s Day', note: 'Shamrocks, rainbow, pot of gold', costumes: ['leprechaun'] },
+  { id: 'earth', name: 'Earth Day', note: 'Wind turbine, planting trees, clean-up', costumes: ['leaf'] },
+  { id: 'july4', name: 'Independence Day', note: 'Flags, picnic, fireworks', costumes: ['patriot'] },
+  { id: 'diwali', name: 'Diwali', note: 'Diyas, rangoli, festival of lights', costumes: ['marigold'] },
+);
+Object.assign(ITEM_SPRITES, {
+  envelope: ['#e33', 3, 4, '#ffd84a'], clover: ['#2fbf4a', 3, 3, '#b8f0c0'], seed: ['#6fbf3a', 2, 3, '#fff'],
+  spark: ['#bbb', 1, 4, '#ffe066'], sweet: ['#ff9a1a', 2, 2, '#ffd84a'], coin: ['#ffd84a', 2, 2, '#fff7a0'], litter: ['#9aa5b5', 3, 3, '#6b7380'],
+});
+// What students do near each holiday's structures (the first six spots are shared; the last three are by the bottom-left structure)
+const NEAR_SPOTS = [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37]];
+Object.assign(LANDMARKS, {
+  lunar: { item: 'envelope', emo: ['star', 'smile', 'heart'], spots: NEAR_SPOTS.concat([[34, 194], [58, 197], [84, 194]]) },
+  stpat: { item: 'clover', emo: ['star', 'smile', 'flower'], spots: NEAR_SPOTS.concat([[34, 192], [58, 197], [84, 192]]) },
+  earth: { item: 'seed', emo: ['flower', 'smile', 'heart'], spots: NEAR_SPOTS.concat([[38, 190], [84, 197], [96, 190]]) },
+  july4: { item: 'spark', emo: ['star', 'smile', 'excl'], spots: NEAR_SPOTS.concat([[36, 196], [60, 196], [88, 198]]) },
+  diwali: { item: 'sweet', emo: ['sparkle', 'smile', 'star'], spots: NEAR_SPOTS.concat([[30, 190], [58, 199], [86, 190]]) },
+});
+Object.assign(EVENT_GATE, { dragondance: 'lunar', lanterns: 'lunar', leprechaun: 'stpat', goldrain: 'stpat', planting: 'earth', cleanup: 'earth',
+  sparklers: 'july4', fireworkshow: 'july4', diyalight: 'diwali', sweets: 'diwali' });
+
+/* ---------- Costumes ---------- */
+const NEW_COSTUMES = {
+  lunar: (x, hy) => { drawRect(x - 3, hy - 1, 7, 2, '#c0392b'); drawRect(x - 2, hy - 3, 5, 2, '#c0392b'); drawRect(x - 1, hy - 4, 3, 1, '#ffd84a'); drawRect(x + 3, hy, 1, 3, '#ffd84a'); },
+  leprechaun: (x, hy) => { drawRect(x - 3, hy - 1, 7, 1, '#1f8a3a'); drawRect(x - 2, hy - 5, 5, 4, '#1f8a3a'); drawRect(x - 2, hy - 2, 5, 1, '#222'); drawRect(x, hy - 2, 1, 1, '#ffd84a'); drawRect(x - 1, hy + 3, 3, 1, '#f08a1a'); },
+  leaf: (x, hy) => { drawRect(x - 3, hy - 1, 7, 1, '#3a8a3a'); drawRect(x - 3, hy - 2, 1, 1, '#5ac85a'); drawRect(x - 1, hy - 2, 1, 1, '#5ac85a'); drawRect(x + 1, hy - 2, 1, 1, '#5ac85a'); drawRect(x + 3, hy - 2, 1, 1, '#5ac85a'); drawRect(x, hy - 2, 1, 1, '#ff9ad5'); },
+  patriot: (x, hy) => { drawRect(x - 4, hy - 1, 9, 1, '#fff'); drawRect(x - 2, hy - 4, 5, 3, '#2a4fd0'); drawRect(x - 2, hy - 2, 5, 1, '#e33'); drawRect(x, hy - 3, 1, 1, '#fff'); },
+  marigold: (x, hy) => { drawRect(x - 3, hy - 1, 7, 1, '#f08a1a'); drawRect(x - 3, hy - 2, 2, 2, '#ffb000'); drawRect(x - 1, hy - 2, 2, 2, '#f08a1a'); drawRect(x + 1, hy - 2, 2, 2, '#ffb000'); drawRect(x + 3, hy - 2, 1, 2, '#f08a1a'); },
+};
+function drawNewCostume(c, x, hy) { if (NEW_COSTUMES[c.cos]) NEW_COSTUMES[c.cos](x, hy); }
+
+/* ---------- Small helpers ---------- */
+const lantern = (x, y, c) => { drawOutlined(() => { drawRect(x - 2, y, 5, 5, c); drawRect(x - 1, y - 1, 3, 1, '#ffd84a'); drawRect(x - 1, y + 5, 3, 1, '#ffd84a'); }); drawRect(x, y + 6, 1, 2, '#ffd84a'); };
+const shamrock = (x, y, c = '#2fbf4a') => { drawRect(x, y, 2, 2, c); drawRect(x + 3, y, 2, 2, c); drawRect(x + 1, y + 2, 3, 2, c); drawRect(x + 2, y + 4, 1, 2, '#1f7a3a'); };
+const pennants = colors => { for (let x = 24; x < 126; x += 5) drawRect(x, 34 + (x / 5 & 1), 3, 3, colors[(x / 5 | 0) % colors.length]); };
+const smallFlag = (x, y) => { drawRect(x, y - 8, 1, 9, '#ccc'); drawRect(x + 1, y - 8, 6, 4, '#fff'); drawRect(x + 1, y - 8, 3, 2, '#2a4fd0'); drawRect(x + 4, y - 7, 3, 1, '#e33'); drawRect(x + 1, y - 5, 6, 1, '#e33'); };
+
+/* ---------- Decorations painted into the background ---------- */
+function drawNewHolidayDecorations() {
+  const h = id => settings.holidays.includes(id), rand = seededRandom(99);
+  if (h('lunar')) {
+    for (let x = 30; x < 125; x += 15) { drawRect(x, 34, 1, 3, '#ffd84a'); lantern(x, 37, '#e33'); }                       // lanterns hanging in the classroom
+    for (let x = 200; x < 300; x += 8) drawRect(x, 17, 3, 3, '#ffd84a');                                                  // gold coins along the stage
+  }
+  if (h('stpat')) {
+    pennants(['#2fbf4a', '#fff', '#ffb347']);
+    for (let x = 28; x < 120; x += 12) shamrock(x, 29);                                                                    // shamrock garland
+    for (let i = 0; i < 50; i++) { const x = 4 + rand() * 310, y = 108 + rand() * 90; drawRect(x, y, 1, 1, '#2fbf4a'); drawRect(x + 2, y, 1, 1, '#2fbf4a'); drawRect(x + 1, y + 1, 1, 1, '#2fbf4a'); drawRect(x + 1, y - 1, 1, 1, '#2fbf4a'); }   // clover patches
+  }
+  if (h('earth')) {
+    pennants(['#3aa04a', '#2a7ad0', '#fff']);
+    for (let y = 22; y < 84; y += 5) { drawRect(16, y, 2, 3, '#2f7d3a'); drawRect(17, y + 1, 2, 1, '#4ab84a'); drawRect(130, y + 2, 2, 3, '#2f7d3a'); }   // vines on the classroom walls
+    for (let i = 0; i < 60; i++) { const x = rand() * 316, y = 110 + rand() * 88; drawRect(x, y + 1, 1, 2, '#3f8236'); drawRect(x - 1, y, 3, 1, ['#ff9ad5', '#ffe066', '#fff', '#9ad4ff'][i % 4]); }   // wild flowers
+  }
+  if (h('july4')) {
+    pennants(['#e33', '#fff', '#2a4fd0']);
+    for (let x = 202; x < 300; x += 10) { drawRect(x, 17, 2, 2, '#fff'); drawRect(x + 1, 16, 1, 4, '#fff'); }                 // stars on the stage
+    [[110, 108], [214, 108], [20, 107], [300, 107]].forEach(([x, y]) => smallFlag(x, y));                                   // flags by the path
+  }
+  if (h('diwali')) {
+    pennants(['#ff9a1a', '#ffd000', '#e33']);
+    drawRangoli(160, 97, .55);                                                                                              // small rangoli on the plaza
+    for (let x = 22; x < 128; x += 4) drawRect(x, 32 + (x / 4 & 1), 2, 2, (x / 4 & 1) ? '#ffb000' : '#f08a1a');            // marigold garland
+  }
+}
+
+/* ---------- Structures: drawNewHolidayStructures paints them, blockNewHolidayStructures makes them solid ---------- */
+function drawNewHolidayStructures(h) {
+  if (h === 'lunar') { drawPagoda(); drawDragonStatue(); drawEnvelopeStall(); }
+  if (h === 'stpat') { drawCottage(); drawRainbowPot(); drawCloverBed(); }
+  if (h === 'earth') { drawEcoStation(); drawGlobeAndBins(); drawGreenhouse(); }
+  if (h === 'july4') { drawBandstand(); drawPicnic(); drawLemonadeStand(); }
+  if (h === 'diwali') { drawDiwaliPalace(); drawRangoli(58, 184, 1); drawDiyaTower(); }
+}
+function blockNewHolidayStructures(h) {
+  if (h === 'lunar') { blockRect(146, 18, 40, 15); blockRect(22, 181, 72, 12); blockRect(238, 176, 28, 20); }
+  if (h === 'stpat') { blockRect(146, 18, 40, 15); blockRect(20, 188, 14, 10); blockRect(238, 180, 24, 16); }
+  if (h === 'earth') { blockRect(164, 24, 8, 10); blockRect(146, 24, 16, 9); blockRect(176, 24, 16, 9); blockRect(46, 172, 24, 24); blockRect(78, 184, 18, 12); blockRect(236, 180, 30, 16); }
+  if (h === 'july4') { blockRect(148, 18, 36, 15); blockRect(24, 184, 24, 10); blockRect(52, 184, 24, 10); blockRect(82, 186, 12, 10); blockRect(238, 178, 28, 18); }
+  if (h === 'diwali') { blockRect(148, 18, 36, 15); blockRect(238, 176, 26, 20); }
+}
+// ---- Lunar New Year ----
+function drawPagoda() {
+  solid(152, 8, 28, 26, '#c0392b'); [155, 165, 174].forEach(x => drawRect(x, 8, 2, 26, '#8f2a1f'));
+  drawRect(152, 20, 28, 1, '#ffd84a'); drawRect(152, 32, 28, 1, '#ffd84a');
+  solid(162, 24, 8, 10, '#7a1f16'); drawRect(166, 24, 1, 10, '#ffd84a'); drawRect(164, 29, 1, 1, '#ffd84a'); drawRect(168, 29, 1, 1, '#ffd84a');
+  glowWindow(156, 12, 4, 5, '#ffd84a', '#8a5a1a'); glowWindow(172, 12, 4, 5, '#ffd84a', '#8a5a1a');
+  gable(142, 15, 48, 5, '#e0a81c', '#b8860b'); gable(147, 9, 38, 5, '#e0a81c', '#b8860b'); gable(154, 3, 24, 5, '#e0a81c', '#b8860b');   // three curved roofs
+  drawRect(165, 0, 2, 3, '#ffd84a'); lantern(148, 22, '#e33'); lantern(183, 22, '#e33');
+}
+function drawDragonStatue() {
+  const seg = i => [22 + i * 4.6, 187 + Math.sin(i * .9) * 5];
+  for (let i = 0; i < 14; i++) { const [x, y] = seg(i); fillEllipse(x, y, 4, 4, INK); }
+  for (let i = 0; i < 14; i++) { const [x, y] = seg(i); fillEllipse(x, y, 3, 3, i % 2 ? '#c0392b' : '#d94a38'); drawRect(x - 1, y - 3, 2, 1, '#ffd84a'); }
+  const [hx, hy] = seg(13), [tx, ty] = seg(0);
+  drawRect(hx + 1, hy - 5, 8, 7, INK); drawRect(hx + 2, hy - 4, 7, 5, '#c0392b'); drawRect(hx + 7, hy - 2, 3, 2, '#ffd84a'); drawRect(hx + 4, hy - 3, 1, 1, '#fff');
+  drawRect(hx + 2, hy - 7, 1, 2, '#ffd84a'); drawRect(hx + 5, hy - 7, 1, 2, '#ffd84a'); pixelLine(hx + 9, hy, hx + 12, hy + 3, '#ffd84a'); drawRect(tx - 5, ty - 1, 3, 2, '#c0392b');
+}
+function drawEnvelopeStall() {
+  solid(240, 188, 24, 8, '#8a2a1f'); drawRect(240, 188, 24, 1, '#c0392b'); drawRect(240, 178, 2, 11, '#6b1f16'); drawRect(262, 178, 2, 11, '#6b1f16');
+  for (let i = 0; i < 28; i++) drawRect(238 + i, 174, 1, 5, i % 4 < 2 ? '#c0392b' : '#ffd84a'); drawRect(238, 173, 28, 1, INK); drawRect(238, 179, 28, 1, INK);
+  [[244, 184], [249, 184], [254, 185], [259, 184]].forEach(([x, y]) => { solid(x, y, 3, 4, '#e33'); drawRect(x + 1, y + 1, 1, 1, '#ffd84a'); });
+  lantern(251, 180, '#e33');
+}
+// ---- St. Patrick's Day ----
+function drawCottage() {
+  solid(148, 17, 36, 15, '#a8a8b0'); for (let i = 0; i < 14; i++) drawRect(150 + (i * 11) % 30, 18 + (i * 5) % 12, 4, 2, i % 2 ? '#8e8e98' : '#bcbcc4');
+  solid(172, 1, 6, 9, '#8e8e98'); gable(143, 4, 46, 14, '#d4ae4a', '#b8902f'); for (let x = 147; x < 185; x += 4) drawRect(x, 7 + (x % 8) / 2, 1, 3, '#a8832c');
+  solid(160, 22, 8, 10, '#1f8a3a'); drawRect(166, 27, 1, 1, '#ffd84a'); shamrock(162, 15);
+  glowWindow(151, 21, 6, 6, '#ffe9a8', '#6b4423'); glowWindow(175, 21, 6, 6, '#ffe9a8', '#6b4423');
+  drawRect(150, 27, 8, 2, '#6b4423'); drawRect(174, 27, 8, 2, '#6b4423'); [151, 154, 157, 175, 178, 181].forEach((x, i) => drawRect(x, 26, 1, 1, ['#ffd84a', '#fff', '#ff9ad5'][i % 3]));
+}
+function drawRainbowPot() {
+  ['#e33', '#f90', '#fd3', '#3b3', '#39f', '#46c', '#a5d'].forEach((c, i) => { const r = 34 - i * 2.2; for (let a = Math.PI; a <= 6.29; a += .03) drawRect(58 + Math.cos(a) * r, 197 + Math.sin(a) * r * .62, 2, 2, c); });
+  fillEllipse(87, 196, 5, 3, '#fff'); fillEllipse(93, 197, 4, 2, '#fff'); fillEllipse(81, 197, 4, 2, '#fff');                // cloud at the far end
+  fillEllipse(25, 194, 8, 5, INK); fillEllipse(25, 194, 7, 4, '#2a2a34'); fillEllipse(25, 190, 7, 3, '#ffd84a');
+  [[22, 189], [26, 188], [28, 191], [20, 191]].forEach(([x, y]) => drawRect(x, y, 2, 1, '#fff7a0'));
+}
+function drawCloverBed() {
+  fillEllipse(250, 188, 14, 9, INK); fillEllipse(250, 188, 13, 8, '#8a8a95'); fillEllipse(250, 188, 11, 6, '#3a8a3a');
+  [[245, 185], [255, 185], [245, 191], [255, 191]].forEach(([x, y]) => { fillEllipse(x, y, 4, 3, '#2fbf4a'); fillEllipse(x - 1, y - 1, 2, 1, '#7be07b'); });
+  drawRect(250, 190, 1, 6, '#1f7a3a'); drawRect(249, 187, 3, 3, '#ffd84a');
+}
+// ---- Earth Day ----
+function drawEcoStation() {
+  [[146, 24], [176, 24]].forEach(([x, y]) => { solid(x, y, 15, 8, '#2a4a8a'); for (let i = 3; i < 15; i += 4) drawRect(x + i, y, 1, 8, '#4a6aba'); drawRect(x, y + 4, 15, 1, '#4a6aba'); drawRect(x + 6, y + 8, 2, 2, '#666'); });   // solar panels
+  solid(162, 24, 11, 10, '#7a9a5a'); drawRect(162, 24, 11, 3, '#4ab84a'); solid(166, 28, 3, 6, '#6b4423');                                                                          // little shed with a green roof
+  solid(166, 9, 3, 16, '#e8eef4'); drawRect(166, 9, 1, 16, '#fff'); drawRect(168, 9, 1, 16, '#c8d0d8');                                                                             // turbine tower (blades are animated)
+}
+function drawGlobeAndBins() {
+  fillEllipse(58, 184, 14, 14, INK); fillEllipse(58, 184, 13, 13, '#2a7ad0');
+  [[53, 178, 5, 3], [60, 184, 4, 5], [52, 189, 4, 3], [63, 177, 3, 3]].forEach(([x, y, rx, ry]) => fillEllipse(x, y, rx, ry, '#3aa04a'));
+  fillEllipse(53, 177, 4, 3, 'rgba(255,255,255,.25)'); solid(52, 196, 12, 3, '#6b4423');
+  [['#2a7ad0', 78], ['#3a9a3a', 85], ['#e1a400', 92]].forEach(([c, x]) => { solid(x, 186, 6, 9, c); drawRect(x - 1, 185, 8, 2, '#444'); drawRect(x + 2, 189, 2, 2, '#fff'); });   // recycling bins
+}
+function drawGreenhouse() {
+  solid(238, 183, 28, 13, '#bfeeee'); for (let i = 0; i < 28; i += 7) drawRect(238 + i, 183, 1, 13, '#e8f4f4'); drawRect(238, 189, 28, 1, '#e8f4f4');
+  gable(236, 173, 32, 11, '#d8f6f6', '#bfeeee');
+  [242, 258].forEach(x => { drawRect(x, 189, 2, 6, '#3aa04a'); drawRect(x - 1, 191, 4, 1, '#4ab84a'); drawRect(x - 1, 190, 2, 2, '#e33'); });
+  solid(250, 187, 6, 9, '#9ad4d4');
+}
+// ---- Independence Day ----
+function drawBandstand() {
+  solid(150, 18, 32, 14, '#f4f4f8'); [152, 160, 168, 176, 180].forEach((x, i) => drawRect(x, 18, 2, 14, i % 2 ? '#2a4fd0' : '#e33'));
+  gable(145, 6, 42, 13, '#2a4fd0', '#1f3fa8'); drawRect(165, 9, 3, 3, '#fff'); drawRect(166, 8, 1, 5, '#fff'); drawRect(164, 10, 5, 1, '#fff');
+  for (let i = 0; i < 20; i++) drawRect(146 + i * 2, 19 + (i & 1), 2, 2, ['#e33', '#fff', '#2a4fd0'][i % 3]);
+  solid(160, 25, 12, 7, '#cfd2dc'); drawRect(148, 3, 1, 12, '#ccc'); drawRect(184, 3, 1, 12, '#ccc');
+}
+function drawPicnic() {
+  [24, 52].forEach(x => {
+    fillEllipse(x + 13, 195, 14, 2, 'rgba(0,20,0,.25)'); drawRect(x + 2, 189, 2, 6, '#6b4423'); drawRect(x + 20, 189, 2, 6, '#6b4423');
+    solid(x, 184, 24, 5, '#e33'); for (let i = 0; i < 12; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2) drawRect(x + i * 2, 185 + j * 2, 2, 2, '#fff');
+  });
+  drawRect(32, 181, 5, 3, '#e33'); drawRect(32, 183, 5, 1, '#3a3'); drawRect(60, 182, 4, 2, '#ffd84a');                       // watermelon slice, snack
+  solid(82, 187, 12, 5, '#333'); drawRect(83, 187, 10, 1, '#f90'); drawRect(84, 192, 2, 4, '#444'); drawRect(90, 192, 2, 4, '#444');   // barbecue grill
+}
+function drawLemonadeStand() {
+  solid(240, 188, 24, 8, '#f4f4f8'); drawRect(240, 178, 2, 11, '#aaa'); drawRect(262, 178, 2, 11, '#aaa');
+  for (let i = 0; i < 28; i++) drawRect(238 + i, 174, 1, 5, i % 4 < 2 ? '#e33' : '#fff'); drawRect(238, 173, 28, 1, INK); drawRect(238, 179, 28, 1, INK);
+  fillEllipse(250, 183, 5, 4, INK); fillEllipse(250, 183, 4, 3, '#ffe066'); drawRect(250, 180, 1, 5, '#e0b800');                    // lemon sign
+  solid(244, 185, 4, 4, '#fff7a0'); solid(256, 185, 4, 4, '#fff7a0');
+}
+// ---- Diwali ----
+function drawDiwaliPalace() {
+  solid(148, 18, 36, 14, '#e8c06a'); drawRect(148, 18, 36, 1, '#fff2c0');
+  for (let i = 0; i < 4; i++) { const x = 152 + i * 8; solid(x, 22, 4, 9, '#7a2a1a'); drawRect(x + 1, 23, 2, 7, '#ffd84a'); }
+  [[154, 17], [178, 17]].forEach(([x, y]) => { fillEllipse(x, y, 5, 5, INK); fillEllipse(x, y, 4, 4, '#e8a020'); drawRect(x, y - 8, 1, 3, '#e8a020'); });
+  fillEllipse(166, 13, 10, 9, INK); fillEllipse(166, 13, 9, 8, '#f0b030'); fillEllipse(163, 10, 4, 3, '#ffd870'); drawRect(166, 2, 1, 5, '#f0b030'); drawRect(165, 3, 3, 1, '#f0b030');
+  for (let x = 148; x < 184; x += 3) drawRect(x, 32 + (x % 2), 2, 2, (x / 3 & 1) ? '#ff9a1a' : '#ffd000');
+}
+// Rangoli: a round, colourful floor pattern. s = scale
+function drawRangoli(cx, cy, s) {
+  const pal = ['#e33', '#ff9a1a', '#ffd84a', '#2fbf4a', '#39f', '#c58cff', '#ff7ab8'];
+  fillEllipse(cx, cy, 22 * s + 1, 14 * s + 1, INK); fillEllipse(cx, cy, 22 * s, 14 * s, '#f4e3c3');
+  for (let ring = 0; ring < 4; ring++) for (let k = 0; k < 8 + ring * 4; k++) { const a = k / (8 + ring * 4) * 6.283, r = 5 + ring * 4; drawRect(cx + Math.cos(a) * r * 1.5 * s - 1, cy + Math.sin(a) * r * .95 * s - 1, 2, 2, pal[(k + ring) % 7]); }
+  drawRect(cx - 1, cy - 1, 3, 3, '#e33');
+}
+const DIYAS = (() => { const list = []; for (let r = 0; r < 5; r++) { const n = 5 - r; for (let i = 0; i < n; i++) list.push([250 - n * 3 + i * 6 + 3, 193 - r * 5]); } return list; })();
+function drawDiyaTower() {
+  solid(238, 195, 24, 3, '#6b4423');
+  DIYAS.forEach(([x, y]) => { drawRect(x - 3, y, 5, 3, '#c46a2a'); drawRect(x - 2, y, 3, 1, '#e89a50'); });
+}
+// ---- Animated parts of the new structures (called every frame) ----
+function animateNewStructures(h) {
+  if (h === 'lunar' && Math.random() < .05) spawnParticle(166, 2, '#ffd84a', -8, 1.5, 0, 1);
+  if (h === 'stpat') {
+    if (Math.random() < .15) drawRect(19 + Math.random() * 12, 186 + Math.random() * 5, 1, 1, '#fff7a0');            // glint on the gold
+    if (Math.random() < .04) spawnParticle(175, 1, '#e0e0e8', -7, 2.2, 0, 2);                                       // chimney smoke
+  }
+  if (h === 'earth') {
+    drawRect(166, 8, 3, 3, '#9aa5b5');
+    for (let k = 0; k < 3; k++) { const a = clock * 2.2 + k * 2.094; drawOutlined(() => pixelLine(167.5, 9, 167.5 + Math.cos(a) * 11, 9 + Math.sin(a) * 11, '#f4f8ff')); }   // turning blades
+  }
+  if (h === 'july4') {
+    [[148, 1], [184, -1]].forEach(([x, d]) => { for (let i = 0; i < 8; i++) for (let row = 0; row < 5; row++) drawRect(x + 1 + i * d - (d < 0 ? 7 : 0), 3 + row + Math.sin(clock * 5 + i * .7), 1, 1, (i < 3 && row < 3) ? '#2a4fd0' : (row % 2 ? '#fff' : '#e33')); });
+    if (Math.random() < .08) spawnParticle(88, 184, '#d0d0d8', -9, 2, 0, 2);                                         // grill smoke
+  }
+  if (h === 'diwali') {
+    DIYAS.forEach(([x, y], i) => { const fl = Math.sin(clock * 10 + i * 1.7) > 0 ? 1 : 0; fillEllipse(x, y - 1, 5, 4, 'rgba(255,190,70,.2)'); drawRect(x, y - 3 - fl, 1, 3, '#ffe066'); drawRect(x, y - 2, 1, 1, '#ff9a1a'); });
+    for (let x = 20; x <= 132; x += 8) bulb(x, 14);
+    drawRect(163, 9, 2, 1, Math.sin(clock * 4) > 0 ? '#fff' : '#ffd870');
+  }
+}
+/* ---------- Falling weather for the new holidays ---------- */
+function newHolidayWeather(dt) {
+  const h = id => settings.holidays.includes(id), drift = (c, s, vx, vy, y, t = 14) => particles.push({ x: randomBetween(0, WIDTH), y, vx, vy, t, m: t, c, g: 0, s });
+  if (h('lunar') && Math.random() < dt * 4) drift(pickOne(['#e33', '#ffd84a']), 2, randomBetween(-6, 6), randomBetween(10, 18), -3);
+  if (h('stpat') && Math.random() < dt * 3) drift(pickOne(['#2fbf4a', '#7be07b', '#ffd84a']), 2, randomBetween(-8, 8), randomBetween(8, 14), -3);
+  if (h('earth') && Math.random() < dt * 2.5) drift(pickOne(['#5ac85a', '#ff9ad5', '#fff']), 2, randomBetween(-10, 3), randomBetween(6, 12), -3);
+  if (h('july4') && Math.random() < dt * .25) fireworkBurst(randomBetween(30, 290), randomBetween(15, 60), pickOne(['#e33', '#fff', '#3a7bff']));
+  if (h('diwali') && Math.random() < dt * 5) drift('#ffd84a', 1, randomBetween(-3, 3), -randomBetween(6, 12), HEIGHT + 2);
+}
+
+/* ---------- Special events for the new holidays ---------- */
+// -- Lunar New Year --
+const dragonPoint = u => [u, 98 + Math.sin(u * .07) * 9];
+addSpecialEvent('dragondance', { text: 'Dragon dance parade!', dur: 17, emo: ['star', 'smile', 'excl'],
+  update(e, dt) { if (Math.random() < dt * 8) { const [x, y] = dragonPoint(e.t * 24 - 10); spawnParticle(x, y - 8, pickOne(['#ffd84a', '#e33', '#fff']), -12, .9, 20, 2); } },
+  draw(e, t) {
+    const u = t * 24 - 10;
+    for (let i = 11; i >= 1; i--) { const [x, y] = dragonPoint(u - i * 7); fillEllipse(x, y + 1, 4, 1.5, 'rgba(0,0,0,.2)'); drawOutlined(() => { drawRect(x - 3, y - 7, 7, 6, i % 2 ? '#c0392b' : '#e0503c'); drawRect(x - 1, y - 8, 3, 1, '#ffd84a'); drawRect(x - 2, y - 1, 1, 2, '#8f2a1f'); drawRect(x + 2, y - 1, 1, 2, '#8f2a1f'); }); }
+    const [x, y] = dragonPoint(u);
+    drawOutlined(() => { drawRect(x - 4, y - 10, 10, 8, '#c0392b'); drawRect(x + 5, y - 7, 3, 3, '#ffd84a'); drawRect(x - 3, y - 12, 2, 3, '#ffd84a'); drawRect(x + 1, y - 12, 2, 3, '#ffd84a'); drawRect(x + 2, y - 9, 2, 2, '#fff'); drawRect(x + 3, y - 9, 1, 1, '#222'); });
+  } });
+addSpecialEvent('lanterns', { text: 'Sky lanterns!', dur: 15, emo: ['star', 'sparkle', 'heart'],
+  start(e) { e.b = [...Array(16)].map((_, i) => ({ x: randomBetween(20, 300), v: randomBetween(8, 13), d: i * .55 })); },
+  draw(e, t, f) {
+    tintScreen(f * .18, '#100830');
+    e.b.forEach(b => { const k = t - b.d, y = HEIGHT + 6 - k * b.v, x = b.x + Math.sin(k * .8) * 5; if (k < 0 || y < -10) return;
+      fillEllipse(x, y + 2, 8, 8, 'rgba(255,200,80,.18)'); drawOutlined(() => { drawRect(x - 2, y, 5, 6, '#e8452c'); drawRect(x - 1, y - 1, 3, 1, '#ffd84a'); drawRect(x - 1, y + 6, 3, 1, '#ffd84a'); }); drawRect(x, y + 3, 1, 1, '#ffe9a8'); });
+  } });
+// -- St. Patrick's Day --
+function drawLeprechaun(x, y) {
+  const s = Math.sin(clock * 16) > 0 ? 1 : 0;
+  fillEllipse(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
+  drawOutlined(() => {
+    drawRect(x - 2, y - 2 - s, 2, 2, '#2a2438'); drawRect(x + 1, y - 2 - (1 - s), 2, 2, '#2a2438');
+    drawRect(x - 3, y - 7, 6, 5, '#1f8a3a'); drawRect(x - 3, y - 5, 6, 1, '#222'); drawRect(x, y - 5, 1, 1, '#ffd84a'); drawRect(x - 4, y - 6 + s, 1, 3, '#1f8a3a'); drawRect(x + 3, y - 6 + (1 - s), 1, 3, '#1f8a3a');
+    drawRect(x - 2, y - 10, 5, 3, '#f6d2b0'); drawRect(x - 2, y - 8, 5, 2, '#f08a1a'); drawRect(x - 1, y - 9, 1, 1, '#222'); drawRect(x + 1, y - 9, 1, 1, '#222');
+    drawRect(x - 3, y - 11, 7, 1, '#1f8a3a'); drawRect(x - 2, y - 15, 5, 4, '#1f8a3a'); drawRect(x - 2, y - 12, 5, 1, '#222'); drawRect(x, y - 12, 1, 1, '#ffd84a');
+  });
+}
+addSpecialEvent('leprechaun', { text: 'A leprechaun is running past!', dur: 14, emo: ['excl', 'smile', 'star'],
+  update(e, dt) {
+    const x = -10 + e.t / e.d * (WIDTH + 20);
+    if (Math.random() < dt * 14) spawnParticle(x, 94, '#ffd84a', 12, 1, 40, 2);
+    if (!e.dropped && e.t > 7) { e.dropped = 1; for (let i = 0; i < 7; i++) { const p = randomWalkablePoint(40, 300, 95, 101); droppedItems.push({ x: p[0], y: p[1], it: 'coin', t: 40 }); } }
+  },
+  draw(e, t) { drawLeprechaun(-10 + t / e.d * (WIDTH + 20), 97 + Math.sin(t * 7) * 3); } });
+addSpecialEvent('goldrain', { text: 'It is raining gold coins!', dur: 13, emo: ['star', 'excl', 'heart'],
+  start() { for (let i = 0; i < 8; i++) { const p = randomWalkablePoint(30, 300, 95, 101); droppedItems.push({ x: p[0], y: p[1], it: 'coin', t: 40 }); } },
+  update(e, dt) { if (Math.random() < dt * 22) particles.push({ x: randomBetween(0, WIDTH), y: -3, vx: randomBetween(-3, 3), vy: randomBetween(25, 40), t: 6, m: 6, c: Math.random() < .7 ? '#ffd84a' : '#2fbf4a', g: 0, s: 2 }); } });
+// -- Earth Day --
+function drawSapling(x, y, g) {
+  const h = 2 + g * 7;
+  fillEllipse(x, y, 4, 2, '#6b4423'); drawRect(x, y - h, 1, h, '#6b4423');
+  fillEllipse(x, y - h, 2 + g * 5, 2 + g * 4, INK); fillEllipse(x, y - h, 1 + g * 5, 1 + g * 4, '#2f8a3a'); fillEllipse(x - 1, y - h - 1, g * 2, g * 1.5, '#5ac85a');
+}
+addSpecialEvent('planting', { text: 'Planting trees for Earth Day!', dur: 16, emo: ['flower', 'smile', 'heart'],
+  start(e) { e.pts = [...Array(6)].map(() => randomWalkablePoint(40, 300, 108, 175)); gatherResidents(e.pts.map(p => [p[0] + 7, p[1] + 2])); },
+  update(e, dt) { e.pts.forEach((p, i) => { if (e.t > i * 1.2 && e.t < i * 1.2 + 3 && Math.random() < dt * 10) spawnParticle(p[0] + randomBetween(-4, 4), p[1] - 8, '#4aa3ff', 14, .5, 40); }); },
+  ground(e) { const f = Math.min(1, e.t / 2, (e.d - e.t) / 2); ctx.globalAlpha = f; e.pts.forEach((p, i) => drawSapling(p[0], p[1], Math.min(1, Math.max(0, (e.t - i * 1.2) / 4)))); ctx.globalAlpha = 1; } });
+addSpecialEvent('cleanup', { text: 'Clean-up day! Pick up the litter!', dur: 16, emo: ['smile', 'star', 'heart'],
+  start() { for (let i = 0; i < 12; i++) { const p = randomWalkablePoint(20, 300, 95, 190); droppedItems.push({ x: p[0], y: p[1], it: 'litter', t: 60 }); } },
+  update(e, dt) { if (Math.random() < dt * 4) spawnParticle(randomBetween(20, 300), randomBetween(100, 190), '#6fe05a', -10, .8, 0, 2); } });
+// -- Independence Day --
+addSpecialEvent('sparklers', { text: 'Sparklers!', dur: 14, emo: ['star', 'smile', 'excl'],
+  start() { residentsOnScreen().slice(0, 14).forEach(c => { if (['idle', 'act', 'go'].includes(c.s)) c.item = 'spark'; }); },
+  update(e, dt) { residentsOnScreen().forEach(c => { if (c.s !== 'freeze' && Math.random() < dt * 5) spawnParticle(c.x + 3, c.y - 6, pickOne(['#ffe066', '#fff', '#ffb347']), randomBetween(-12, -4), .5, 30, 1); }); } });
+addSpecialEvent('fireworkshow', { text: 'Red, white and blue fireworks!', dur: 17, emo: ['star', 'excl', 'smile'],
+  update(e, dt) {
+    e.fx2 = (e.fx2 || 0) - dt;
+    if (e.fx2 <= 0) { e.fx2 = .55; const x = randomBetween(40, 280), y = randomBetween(18, 70); ['#e33', '#fff', '#3a7bff'].forEach((c, i) => fireworkBurst(x + (i - 1) * 14, y + Math.abs(i - 1) * 6, c)); }
+  },
+  draw(e, t, f) { tintScreen(f * .28, '#0a1640'); } });
+// -- Diwali --
+addSpecialEvent('diyalight', { text: 'Lighting the diyas!', dur: 16, emo: ['sparkle', 'star', 'heart'],
+  update(e, dt) { if (Math.random() < dt * 10) spawnParticle(randomBetween(14, 300), 104, '#ffd84a', -12, 1.2, 0, 1); },
+  draw(e, t) {
+    for (let i = 0; i < 26; i++) {
+      const x = 14 + i * 11.5, y = 108; drawRect(x - 2, y, 5, 2, '#c46a2a');
+      if (t > i * .35) { const fl = Math.sin(t * 10 + i) > 0 ? 1 : 0; fillEllipse(x, y - 1, 6, 5, 'rgba(255,190,70,.22)'); drawRect(x, y - 3 - fl, 1, 3, '#ffe066'); drawRect(x, y - 2, 1, 1, '#ff9a1a'); }
+    }
+  } });
+addSpecialEvent('sweets', { text: 'Sweets for everyone!', dur: 14, emo: ['smile', 'heart', 'star'],
+  start() { for (let i = 0; i < 10; i++) { const p = randomWalkablePoint(30, 300, 95, 101); droppedItems.push({ x: p[0], y: p[1], it: 'sweet', t: 40 }); } },
+  update(e, dt) { if (Math.random() < dt * 8) particles.push({ x: randomBetween(0, WIDTH), y: -3, vx: randomBetween(-5, 5), vy: randomBetween(10, 18), t: 14, m: 14, c: pickOne(['#ff9a1a', '#ffd000']), g: 0, s: 2 }); } });
 
 // ---- First-time setup: load saved settings, build the settings window, build the scenery ----
 loadConfig();
