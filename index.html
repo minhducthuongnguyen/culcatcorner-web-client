@@ -797,6 +797,7 @@ function applyConfig() {
   else if (!hh && hhWasOn) cast.forEach(([i]) => { if (people[i].s === 'away') people[i].ret = clock; });
   hhWasOn = hh;
   if (!h.includes('xmas')) snowCover = 0;                               // snow melts when Christmas is switched off
+  setupHolidayActivity();
   people.splice(44);            // remove any visitors currently on screen
   people.forEach(giveCostume);
   rebuildWorld();
@@ -952,6 +953,7 @@ function drawBookProps() {
   drawHolidayDecorations();
 }
 function blockPropCells() {
+  blockHolidayStructures();
   const on = id => settings.series.includes(id), h = id => settings.holidays.includes(id);
   if (on('pete')) blockRect(117, 111, 16, 6);
   if (on('arthur')) blockRect(202, 77, 14, 10);
@@ -1004,6 +1006,7 @@ function drawHolidayDecorations() {
 }
 function drawExtraScenery() {
   drawBookProps();
+  drawHolidayStructures();
   // Christmas: remember which pixels are ground, so snow can pile up there later
   if (settings.holidays.includes('xmas')) buildSnowMask(); else snowThreshold = null;
 }
@@ -1021,6 +1024,7 @@ snowCanvas.height = HEIGHT;
 
 // Is this background pixel grass or path (snow can settle) rather than a building, water, etc.?
 function isGroundPixel(r, g, b, x, y) {
+  if (structureRects.some(q => x >= q[0] && x < q[0] + q[2] && y >= q[1] && y < q[1] + q[3])) return false;   // snow does not settle on structures
   const insideBuilding = (x > 13 && x < 137 && y > 10 && y < 96) || (x > 193 && x < 307 && y > 7 && y < 79);
   if (insideBuilding) return false;
   const grass = g > r + 12 && g > b + 25;
@@ -1030,10 +1034,17 @@ function isGroundPixel(r, g, b, x, y) {
 function buildSnowMask() {
   const pixels = backgroundCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT).data;
   snowThreshold = new Float32Array(SNOW_COLS * SNOW_ROWS).fill(2);
+  // Coarse random grid, smoothly interpolated: neighbouring blocks get similar thresholds, so snow settles in blobby patches
+  const CC = 41, CR = 26, coarse = Array.from({ length: CC * CR }, () => Math.random());
+  const smoothNoise = (bx, by) => {
+    const fx = bx / SNOW_COLS * (CC - 1), fy = by / SNOW_ROWS * (CR - 1), x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+    const at = (x, y) => coarse[Math.min(CR - 1, y) * CC + Math.min(CC - 1, x)];
+    return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
+  };
   for (let by = 0; by < SNOW_ROWS; by++) {
     for (let bx = 0; bx < SNOW_COLS; bx++) {
       const x = bx * SNOW_BLOCK, y = by * SNOW_BLOCK, i = (y * WIDTH + x) * 4;
-      if (isGroundPixel(pixels[i], pixels[i + 1], pixels[i + 2], x, y)) snowThreshold[by * SNOW_COLS + bx] = Math.random();
+      if (isGroundPixel(pixels[i], pixels[i + 1], pixels[i + 2], x, y)) snowThreshold[by * SNOW_COLS + bx] = Math.min(.999, Math.max(0, (smoothNoise(bx, by) - .5) * 1.9 + .5 + (Math.random() - .5) * .2));
     }
   }
   snowDrawnStep = -1;
@@ -1059,6 +1070,8 @@ const bulb = (x, y) => drawRect(x, y, 2, 2, ['#e33', '#fd3', '#3a3', '#39f'][(Ma
 function butterfly(x, y, c) { const f = Math.sin(clock * 18 + x) > 0 ? 1 : 0; drawRect(x - 2, y - f, 2, 2, c); drawRect(x + 1, y - f, 2, 2, c); drawRect(x, y, 1, 2, '#222'); }
 function drawAnimatedScenery() {
   drawSnowCover();
+  animateSceneDetail();
+  animateHolidayStructures();
   [0, 1, 2].forEach(i => butterfly(60 + Math.cos(clock * .5 + i * 2) * 40, 138 + Math.sin(clock * .7 + i * 2) * 25, ['#ff9ad5', '#ffe066', '#6ef'][i]));
   if (settings.series.includes('frog')) [[238, 131], [286, 152]].forEach(([x, y], i) => {          // frogs hopping by the pond
     const hop = Math.max(0, Math.sin(clock * 2.5 + i * 3)) * 3;
@@ -1454,13 +1467,18 @@ function routeToNearestEdge(x, y) {
 }
 // Draw a tree (sorted by its base so characters can walk behind it)
 function drawTreeBase(x, y) {
-    fillEllipse(x + 7, y + 1, 11, 3, 'rgba(0,20,0,.25)');
-    drawRectOutline(x - 1, y - 6, 3, 6);
-    drawRect(x - 1, y - 6, 3, 6, '#6b4423');
-    fillEllipse(x, y - 14, 10, 9, treeColors[0]);
-    fillEllipse(x, y - 14, 9, 8, treeColors[1]);
-    fillEllipse(x - 2, y - 16, 5, 4, treeColors[2]);
-    drawRect(x + 3, y - 12, 2, 2, treeColors[3]);
+    fillEllipse(x + 8, y + 1, 12, 3, 'rgba(0,20,0,.28)');                    // cast shadow (light comes from the top-left)
+    drawRectOutline(x - 2, y - 7, 4, 7);                                     // trunk with bark shading and roots
+    drawRect(x - 2, y - 7, 4, 7, '#6b4423'); drawRect(x - 2, y - 7, 1, 7, '#8a5a30'); drawRect(x + 1, y - 7, 1, 7, '#4a2e16');
+    drawRect(x - 3, y - 1, 1, 1, '#6b4423'); drawRect(x + 2, y - 1, 1, 1, '#4a2e16');
+    const blobs = [[0, -15, 9, 8], [-6, -12, 6, 5], [6, -12, 6, 5], [0, -21, 6, 5]];   // canopy = four overlapping leaf clusters
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx + 1, ry + 1, treeColors[0]));
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx, ry, treeColors[1]));
+    fillEllipse(x - 2, y - 18, 5, 3, treeColors[2]); fillEllipse(x - 6, y - 13, 3, 2, treeColors[2]);   // sunny side
+    for (let i = 0; i < 12; i++) {                                           // shaded underside + leaf specks
+        drawRect(x + ((i * 7) % 15) - 6, y - 8 - ((i * 5) % 7), 2, 1, treeColors[3]);
+        if (i % 3 === 0) drawRect(x + ((i * 5) % 13) - 8, y - 22 + ((i * 3) % 8), 1, 1, treeColors[2]);
+    }
 }
 function drawTree(x, y) {
     drawTreeBase(x, y);
@@ -1511,6 +1529,7 @@ function drawStaticScene() {
     for (let i = 0; i < 130; i++) {
         drawRect(randomBetween(12, 300), randomBetween(91, 103), 1, 1, '#b8a375');
     }
+    drawGroundDetail();
     // classroom
     drawRect(132, 22, 7, 70, 'rgba(0,30,0,.25)');
     drawRect(24, 92, 112, 5, 'rgba(0,30,0,.25)');
@@ -1620,6 +1639,7 @@ function drawStaticScene() {
     drawRectOutline(104, 121, 8, 11, K);
     drawRectOutline(159, 104, 26, 13, K);
     ACTIVITIES.lesson.s.forEach(s => drawRectOutline(s[0] - 6, s[1] - 4, 10, 6, K));
+    drawSceneDetail();
     drawExtraScenery();
     ctx = canvas.getContext('2d');
 }
@@ -1815,6 +1835,10 @@ function drawCharacterSprite(c) {
     if (c.tc) {
         drawRect(x - 3, y - 9 - b, 7, 9, c.rb);
         drawRect(x - 3, y - 2 - b, 7, 1, 'rgba(0,0,0,.25)');
+        drawRect(x - 3, y - 1 - b, 7, 1, '#d9b24a');                      // gold hem
+        drawRect(x - 3, y - 5 - b, 7, 1, '#d9b24a');                      // belt
+        drawRect(x - 2, y, 2, 1, '#3a2a1a'); drawRect(x + 1, y, 2, 1, '#3a2a1a');   // shoes peeking out
+        drawRect(x - 1, y - 9 - b, 3, 1, 'rgba(255,255,255,.35)');       // collar
         drawRect(x, y - 8 - b, 1, 6, '#ffe066');
         drawRect(x - 4, y - 8 - b, 1, 4, c.rb);
         drawRect(x + 4, y - 8 - b, 1, 4, c.rb);
@@ -1838,11 +1862,18 @@ function drawCharacterSprite(c) {
     const o = sit ? 2 : 0;
     if (!sit) {
         const l = mvg && Math.sin(c.ph) > 0;
-        drawRect(x - 2, y - 2 - (l ? 1 : 0), 2, 2, '#2a2438');
-        drawRect(x + 1, y - 2 - (mvg && !l ? 1 : 0), 2, 2, '#2a2438');
+        const lift1 = l ? 1 : 0, lift2 = mvg && !l ? 1 : 0;
+        drawRect(x - 2, y - 2 - lift1, 2, 1, '#3a3350');                 // trousers
+        drawRect(x + 1, y - 2 - lift2, 2, 1, '#3a3350');
+        drawRect(x - 3, y - 1 - lift1, 3, 1, '#7a5a3a');                 // shoes (toe pointing out)
+        drawRect(x + 1, y - 1 - lift2, 3, 1, '#7a5a3a');
     }
     drawRect(x - 3, y - 6 - b + o, 6, 4, c.rb);
     drawRect(x - 3, y - 3 - b + o, 6, 1, 'rgba(0,0,0,.22)');
+    drawRect(x - 3, y - 4 - b + o, 6, 1, '#d9b24a');                       // belt
+    drawRect(x - 1, y - 6 - b + o, 2, 1, 'rgba(255,255,255,.35)');        // collar
+    drawRect(x - 3, y - 6 - b + o, 1, 2, 'rgba(255,255,255,.2)');         // light on the left
+    drawRect(x + 2, y - 5 - b + o, 1, 3, 'rgba(0,0,0,.18)');              // shade on the right
     const ay = sc ? y - 10 - b : y - 6 - b + o;
     drawRect(x - 4, ay, 1, 3, c.rb);
     drawRect(x + 3, ay, 1, 3, c.rb);
@@ -1859,6 +1890,9 @@ function drawCharacterSprite(c) {
     else {
         drawRect(x - 1, y - 8 - b + o, 1, 1, '#222');
         drawRect(x + 1, y - 8 - b + o, 1, 1, '#222');
+        drawRect(x - 2, y - 7 - b + o, 1, 1, 'rgba(255,110,110,.55)');   // cheeks
+        drawRect(x + 2, y - 7 - b + o, 1, 1, 'rgba(255,110,110,.55)');
+        drawRect(x, y - 7 - b + o, 1, 1, '#a55');                        // smile
     }
     if (c.gl) {
         drawRect(x - 2, y - 9 - b + o, 2, 2, '#222');
@@ -1870,11 +1904,18 @@ function drawCharacterSprite(c) {
         drawRect(x - 3, y - 11 - b + o, 7, 1, c.hc);
         drawRect(x - 2, y - 12 - b + o, 5, 2, c.hc);
         drawRect(x - 1, y - 14 - b + o, 3, 2, c.hc);
+        drawRect(x - 2, y - 11 - b + o, 5, 1, 'rgba(255,255,255,.3)');   // hat band
+        drawRect(x - 1, y - 13 - b + o, 1, 1, 'rgba(255,255,255,.25)');
     }
-    else {
+    else {                                                               // four hair styles, chosen by the character's id
         drawRect(x - 2, y - 10 - b + o, 5, 1, c.hr);
         drawRect(x - 3, y - 9 - b + o, 1, 2, c.hr);
         drawRect(x + 3, y - 9 - b + o, 1, 2, c.hr);
+        const style = c.id % 4;
+        if (style === 1) drawRect(x - 2, y - 9 - b + o, 4, 1, c.hr);                                   // fringe
+        if (style === 2) { drawRect(x + 3, y - 8 - b + o, 1, 4, c.hr); drawRect(x + 4, y - 6 - b + o, 1, 2, c.hr); }   // ponytail
+        if (style === 3) { drawRect(x - 2, y - 11 - b + o, 1, 1, c.hr); drawRect(x, y - 11 - b + o, 1, 1, c.hr); drawRect(x + 2, y - 11 - b + o, 1, 1, c.hr); }   // spiky
+        drawRect(x - 2, y - 10 - b + o, 2, 1, 'rgba(255,255,255,.2)');                                 // shine
     }
     if (c.cos) {
         drawCostume(c, x, y - 9 - b + o);
@@ -2156,6 +2197,210 @@ function drawFrame() {
     L.forEach(o => o[1]());
     drawOverlay();
 }
+/* =====================================================================
+ * EXTRA PIXEL DETAIL AND HOLIDAY STRUCTURES
+ * Painted once into the background image (static) unless noted as "animated".
+ * ===================================================================== */
+const INK = '#1b1228';                                   // outline colour used everywhere
+const structureRects = [];                              // [x, y, w, h] of holiday buildings (snow does not settle on them)
+// A tiny seeded random generator, so the "random" grass looks the same every time the background is repainted
+function seededRandom(seed) { let s = seed; return () => (s = (s * 9301 + 49297) % 233280) / 233280; }
+// Outlined filled rectangle
+function solid(x, y, w, h, color, outline = INK) { drawRectOutline(x, y, w, h, outline); drawRect(x, y, w, h, color); }
+// Gabled (triangular) roof: w wide, h tall, its bottom edge at y + h; 'shingle' colours every other row
+function gable(x, y, w, h, color, shingle) {
+  const inset = r => Math.round((h - 1 - r) * (w / 2 - 1) / Math.max(1, h - 1));
+  for (let r = 0; r < h; r++) drawRect(x + inset(r) - 1, y + r, w - 2 * inset(r) + 2, 1, INK);
+  for (let r = 0; r < h; r++) drawRect(x + inset(r), y + r, w - 2 * inset(r), 1, r % 2 ? shingle : color);
+}
+const heart = (x, y, c) => { drawRect(x, y, 2, 2, c); drawRect(x + 3, y, 2, 2, c); drawRect(x, y + 1, 5, 2, c); drawRect(x + 1, y + 3, 3, 1, c); drawRect(x + 2, y + 4, 1, 1, c); };
+const glowWindow = (x, y, w, h, c, bar) => { solid(x, y, w, h, c); drawRect(x + (w >> 1), y, 1, h, bar); drawRect(x, y + (h >> 1), w, 1, bar); };
+
+/* ---------- Ground detail: grass tufts, flowers, cobblestones ---------- */
+function drawGroundDetail() {
+  const rand = seededRandom(4242), rr = (a, b) => a + rand() * (b - a);
+  const onPath = (x, y) => (y > 85 && y < 108 && x > 8 && x < 312) || (x > 64 && x < 94 && y > 78 && y < 108) || (((x - 160) / 28) ** 2 + ((y - 97) / 12) ** 2 < 1);
+  for (let i = 0; i < 70; i++) { const x = rr(0, WIDTH), y = rr(0, HEIGHT); if (!onPath(x, y)) fillEllipse(x, y, rr(5, 12), rr(2, 5), i % 2 ? '#62ad50' : '#549644'); }   // lighter / darker patches
+  for (let i = 0; i < 320; i++) {                                                                       // grass tufts
+    const x = rr(2, WIDTH - 2), y = rr(3, HEIGHT - 2); if (onPath(x, y)) continue;
+    drawRect(x, y, 1, 2, '#3f8236'); drawRect(x - 1, y + 1, 1, 1, '#3f8236'); drawRect(x + 1, y + 1, 1, 1, '#3f8236'); drawRect(x, y - 1, 1, 1, '#7bc566');
+  }
+  for (let i = 0; i < 70; i++) {                                                                        // tiny flowers
+    const x = rr(2, WIDTH - 2), y = rr(3, HEIGHT - 2); if (onPath(x, y)) continue;
+    const c = ['#fff', '#ffe066', '#ff9ad5', '#c58cff', '#ff7a5a'][i % 5];
+    drawRect(x, y + 1, 1, 2, '#3f8236'); drawRect(x - 1, y, 3, 1, c); drawRect(x, y - 1, 1, 3, c); drawRect(x, y, 1, 1, '#ffd84a');
+  }
+  // cobblestones: three rows on the path (each row shifted), a ring pattern on the plaza, a few by the door
+  const cobble = (x, y) => { const b = ['#dccb9b', '#d3c190', '#e2d3a6'][(rand() * 3) | 0]; drawRect(x, y, 5, 3, b); drawRect(x, y, 3, 1, '#ece0b8'); drawRect(x, y + 2, 5, 1, '#bba878'); drawRect(x + 5, y, 1, 3, '#bba878'); };
+  for (let row = 0; row < 3; row++) for (let x = 12 - (row % 2) * 3; x < 306; x += 6) cobble(x, 91 + row * 4);
+  for (let a = 0; a < 6.28; a += .3) { drawRect(160 + Math.cos(a) * 21, 97 + Math.sin(a) * 8, 3, 2, '#c4b080'); drawRect(160 + Math.cos(a) * 12, 97 + Math.sin(a) * 4.5, 3, 2, '#c4b080'); }
+  for (let y = 83; y < 91; y += 4) for (let x = 70; x < 88; x += 6) cobble(x + (y % 8 ? 3 : 0), y);
+  drawRect(12, 90, 296, 1, '#b8a375'); drawRect(12, 103, 296, 1, '#b8a375');
+}
+
+/* ---------- Scenery detail: roof tiles, chimney, curtains, chairs, lamps, pond rocks ... ---------- */
+function drawSceneDetail() {
+  // classroom roof edge + chimney
+  for (let x = 16; x < 134; x += 4) { drawRect(x, 13, 3, 2, '#c8644a'); drawRect(x + 1, 15, 3, 1, '#8f3f2a'); }
+  drawRect(16, 13, 118, 1, '#e08a6a');
+  solid(112, 4, 9, 9, '#9a4a38'); for (let y = 6; y < 13; y += 3) drawRect(112, y, 9, 1, '#6e2f22'); drawRect(115, 5, 1, 8, '#6e2f22'); drawRect(111, 3, 11, 2, '#6b3a2a');
+  // window curtains, sills and plants
+  [[26, 19], [110, 19]].forEach(([x, y]) => { drawRect(x, y, 3, 8, '#c0392b'); drawRect(x + 11, y, 3, 8, '#c0392b'); drawRect(x - 1, y + 8, 16, 1, '#8a5a3a'); drawRect(x + 4, y + 6, 2, 2, '#2f7d3a'); drawRect(x + 8, y + 6, 2, 2, '#ff9ad5'); });
+  // chairs behind every desk, sunbeams, corner plant, doormat
+  [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => { drawRect(x + 3, y + 9, 8, 2, '#7a4a2a'); drawRect(x + 3, y + 8, 8, 1, '#9a6a3a'); }));
+  for (let j = 0; j < 36; j++) { drawRect(30 + j * .5, 34 + j, 9, 1, 'rgba(255,255,210,.07)'); drawRect(112 - j * .5, 34 + j, 9, 1, 'rgba(255,255,210,.07)'); }
+  drawRect(23, 30, 5, 3, '#a0522d'); drawRect(22, 26, 7, 5, '#2f7d3a'); drawRect(24, 25, 2, 2, '#4ab84a'); drawRect(72, 91, 14, 2, '#6b3a2a');
+  // stage: pennants, footlights, steps
+  drawRect(198, 5, 106, 1, '#444'); for (let x = 198; x < 304; x += 6) drawRect(x, 6 + ((x / 6) & 1), 3, 3, ['#e33', '#fd3', '#39f', '#3a3'][(x / 6 | 0) % 4]);
+  for (let x = 204; x < 296; x += 8) drawRect(x, 63, 2, 1, '#ffe9a8');
+  solid(244, 67, 16, 3, '#6b4423');
+  // pond: rocks round the rim and reeds
+  for (let a = 0; a < 6.28; a += .45) fillEllipse(265 + Math.cos(a) * 30, 140 + Math.sin(a) * 17, 2, 1, a % .9 < .45 ? '#8a8a95' : '#a5a5b0');
+  [[238, 128], [292, 150], [244, 155]].forEach(([x, y]) => { drawRect(x, y, 1, 7, '#6a8a3a'); drawRect(x + 2, y + 2, 1, 5, '#6a8a3a'); drawRect(x, y - 1, 1, 2, '#5a3a1a'); });
+  // garden: plot signs and gate
+  [25, 52, 79].forEach((x, i) => { drawRect(x + 10, 113, 1, 3, '#8a5a3a'); drawRect(x + 8, 111, 5, 3, ['#ff9ad5', '#ffe066', '#9ad4ff'][i]); });
+  drawRect(56, 105, 2, 6, '#8a5a3a'); drawRect(82, 105, 2, 6, '#8a5a3a'); drawRect(56, 105, 28, 1, '#8a5a3a');
+  // lamp posts along the path
+  [[40, 106], [95, 106], [225, 106], [270, 106]].forEach(([x, y]) => { fillEllipse(x + 2, y + 1, 3, 1, 'rgba(0,0,0,.25)'); drawRect(x, y - 10, 1, 10, '#3a3a44'); solid(x - 1, y - 14, 3, 4, '#ffe9a8'); drawRect(x - 2, y - 15, 5, 1, '#3a3a44'); });
+}
+// Animated: chimney smoke and sparkles on the pond water
+function animateSceneDetail() {
+  if (Math.random() < .03) spawnParticle(116, 3, '#e0e0e8', -7, 2.5, 0, 2);
+  if (Math.random() < .25) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()); drawRect(265 + Math.cos(a) * 26 * r, 140 + Math.sin(a) * 13 * r, 1, 1, '#e8f6ff'); }
+}
+
+/* ---------- Holiday structures: a big landmark at the top-middle (A) and a second one at the bottom-left (B) ---------- */
+const ITEM_EXTRA = Object.assign(ITEM_SPRITES, { candy: ['#f90', 2, 2, '#fff'], corn: ['#ffd84a', 2, 4, '#3a3'] });
+// Visitors' favourite spots at each holiday's structures (students walk there, carry an item and show emoji)
+const LANDMARKS = {
+  halloween: { item: 'candy', emo: ['excl', 'sweat', 'smile'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [32, 193], [56, 193], [80, 193]] },
+  thanks: { item: 'corn', emo: ['smile', 'heart', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [30, 194], [46, 194], [78, 194]] },
+  xmas: { item: 'gift', emo: ['star', 'smile', 'heart'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [30, 190], [86, 190], [34, 197]] },
+  valentine: { item: 'card', emo: ['heart', 'smile', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [34, 188], [84, 188], [36, 197]] },
+  easter: { item: 'egg', emo: ['flower', 'smile', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [34, 192], [84, 192], [58, 197]] },
+};
+function setupHolidayActivity() {
+  people.forEach(c => { if (c.act === 'landmark') { releaseSpot(c); c.item = null; c.s = 'idle'; c.w = 1; } });
+  delete ACTIVITIES.landmark;
+  const def = LANDMARKS[settings.holidays[0]];
+  if (def) ACTIVITIES.landmark = { w: 3, it: def.item, em: def.emo, d: [8, 18], s: def.spots, o: def.spots.map(() => null) };
+}
+function blockHolidayStructures() {
+  const h = settings.holidays[0];
+  if (h === 'halloween') { blockRect(144, 18, 42, 15); [26, 38, 50, 62, 74, 86].forEach((x, i) => blockRect(x, 184 + (i % 2) * 2, 7, 5)); blockRect(89, 189, 7, 6); }
+  if (h === 'thanks') { blockRect(144, 18, 44, 15); blockRect(56, 184, 4, 10); }
+  if (h === 'xmas') { blockRect(144, 18, 44, 15); blockRect(44, 172, 28, 22); }
+  if (h === 'valentine') { blockRect(148, 18, 36, 15); blockRect(42, 175, 34, 23); }
+  if (h === 'easter') { blockRect(148, 26, 36, 8); blockRect(49, 174, 18, 20); }
+}
+function drawHolidayStructures() {
+  structureRects.length = 0;
+  const h = settings.holidays[0];
+  if (h === 'halloween') { drawHauntedHouse(); drawGraveyard(); }
+  if (h === 'thanks') { drawBarn(); drawCornfield(); }
+  if (h === 'xmas') { drawWorkshop(); drawGiantTree(); drawFrozenPond(); }
+  if (h === 'valentine') { drawGazebo(); drawHeartBed(); }
+  if (h === 'easter') { drawBurrow(); drawEasterEgg(); }
+}
+// ---- Halloween ----
+function drawHauntedHouse() {
+  solid(146, 16, 38, 16, '#3d3050'); for (let x = 148; x < 182; x += 4) drawRect(x, 16, 1, 16, '#2e2440');
+  gable(143, 6, 44, 11, '#2a1a3a', '#35224a');
+  solid(176, 6, 9, 12, '#4a3a5a'); gable(174, 0, 13, 7, '#2a1a3a', '#35224a');                       // crooked tower
+  glowWindow(152, 20, 5, 6, '#ffd84a', '#8a5a1a'); glowWindow(166, 20, 5, 6, '#ffd84a', '#8a5a1a'); glowWindow(178, 10, 3, 4, '#ffd84a', '#8a5a1a');
+  solid(160, 22, 7, 10, '#120a1c'); drawRect(165, 27, 1, 1, '#ffd84a'); drawRect(158, 32, 11, 1, '#6a5a7a');   // door and step
+  drawRect(155, 8, 3, 1, '#111'); drawRect(154, 7, 1, 1, '#111'); drawRect(158, 7, 1, 1, '#111');   // bat on the roof
+  for (let i = 0; i < 6; i++) drawRect(147 + i, 17 + i, 1, 1, '#bbb');                                // cobweb
+  structureRects.push([142, 0, 48, 34]);
+}
+function drawGraveyard() {
+  [26, 38, 50, 62, 74, 86].forEach((x, i) => {
+    const y = 181 + (i % 2) * 2;
+    solid(x, y, 7, 9, '#9a9aa8'); drawRect(x + 1, y - 1, 5, 1, '#9a9aa8'); drawRect(x + 3, y + 2, 1, 4, '#5a5a68'); drawRect(x + 2, y + 3, 3, 1, '#5a5a68');
+    drawRect(x, y + 7, 2, 2, '#4a7a3a'); drawRect(x + 7, y + 3, 2, 6, 'rgba(0,0,0,.2)');
+  });
+  solid(90, 190, 5, 4, '#f08a1a'); drawRect(91, 191, 1, 1, INK); drawRect(93, 191, 1, 1, INK);   // jack-o'-lantern
+  drawRect(22, 197, 76, 1, '#444'); for (let x = 22; x < 98; x += 4) drawRect(x, 195, 1, 3, '#444');   // iron fence
+  structureRects.push([20, 174, 86, 26]);
+}
+// ---- Thanksgiving ----
+function drawBarn() {
+  solid(146, 16, 38, 16, '#b03a2a'); for (let x = 148; x < 182; x += 3) drawRect(x, 17, 1, 15, '#8f2e22');
+  gable(143, 6, 44, 11, '#6a3a2a', '#7a4a34'); drawRect(146, 16, 38, 1, '#f4e3c3');
+  solid(158, 20, 14, 12, '#8a2a1f'); for (let i = 0; i < 12; i++) { drawRect(158 + i * 13 / 12, 20 + i, 1, 1, '#f4e3c3'); drawRect(171 - i * 13 / 12, 20 + i, 1, 1, '#f4e3c3'); }
+  solid(163, 10, 6, 5, '#2a1a14'); drawRect(164, 12, 4, 3, '#d9b24a');                                   // hayloft
+  drawRect(165, 0, 1, 6, '#444'); drawRect(163, 1, 5, 1, '#444'); drawRect(167, 0, 2, 2, '#ffd84a');   // weather vane
+  structureRects.push([142, 0, 48, 34]);
+}
+function drawCornfield() {
+  for (const y of [181, 191]) for (let x = 24; x < 92; x += 6) {
+    if (x > 50 && x < 64) continue;
+    drawRect(x, y, 1, 9, '#6a9a30'); drawRect(x - 2, y + 2, 2, 1, '#7aa83a'); drawRect(x + 1, y + 4, 2, 1, '#7aa83a');
+    drawRect(x + 1, y + 3, 2, 3, '#ffd84a'); drawRect(x + 1, y + 3, 1, 1, '#fff7a0'); drawRect(x, y - 1, 1, 1, '#d9b24a'); drawRect(x + 1, y + 9, 3, 1, 'rgba(0,0,0,.2)');
+  }
+  drawRect(58, 180, 1, 14, '#6b4423'); drawRect(53, 184, 11, 1, '#6b4423'); solid(55, 184, 7, 5, '#c0392b'); drawRect(57, 186, 2, 2, '#e1a400');   // scarecrow
+  solid(56, 178, 5, 5, '#e8c58a'); drawRect(54, 177, 9, 1, '#4a3a2a'); drawRect(56, 174, 5, 3, '#4a3a2a'); drawRect(57, 180, 1, 1, '#222'); drawRect(59, 180, 1, 1, '#222');
+  drawRect(52, 185, 2, 2, '#e1c34a'); drawRect(63, 185, 2, 2, '#e1c34a');
+  structureRects.push([20, 172, 80, 28]);
+}
+// ---- Christmas ----
+function drawWorkshop() {
+  solid(146, 16, 38, 16, '#7a4a2a'); for (let y = 18; y < 31; y += 3) drawRect(146, y, 38, 1, '#5a3418');
+  solid(172, 0, 6, 9, '#8a4a3a'); drawRect(171, -1, 8, 2, '#fff');                                       // chimney (smoke is animated)
+  gable(143, 5, 44, 12, '#f4f8ff', '#dfe9f6'); drawRect(143, 17, 44, 1, '#c0392b');                       // snowy roof
+  glowWindow(150, 21, 5, 6, '#ffb347', '#7a4a1a'); glowWindow(176, 21, 5, 6, '#ffb347', '#7a4a1a');
+  solid(162, 22, 8, 10, '#2e6a3a'); fillEllipse(166, 25, 3, 3, '#1f8a3a'); drawRect(165, 27, 2, 1, '#e33');   // door with wreath
+  for (let y = 20; y < 32; y += 2) { drawRect(158, y, 2, 1, '#e33'); drawRect(158, y + 1, 2, 1, '#fff'); drawRect(173, y, 2, 1, '#e33'); drawRect(173, y + 1, 2, 1, '#fff'); }   // candy-cane posts
+  solid(158, 17, 16, 4, '#d9b24a'); drawRect(165, 18, 3, 2, '#e33');                                       // sign with a present
+  structureRects.push([142, -2, 48, 36]);
+}
+function drawGiantTree() {
+  [30, 24, 18].forEach((w, t) => gable(58 - w / 2, 171 + t * 7, w, 11, '#1f6a3a', '#18552f'));
+  solid(55, 196, 6, 3, '#6b4423');
+  [[52, 180, '#e33'], [63, 182, '#fd3'], [49, 187, '#39f'], [58, 177, '#f6a'], [66, 188, '#e33'], [55, 192, '#fd3'], [60, 186, '#fff']].forEach(([x, y, c]) => drawRect(x, y, 2, 2, c));
+  for (let i = 0; i < 18; i++) drawRect(48 + i * 1.1, 179 + Math.sin(i) * 2 + i * .3, 1, 1, '#ffd84a');   // garland
+  [[36, 194, '#e33'], [42, 195, '#39f'], [72, 195, '#3a3'], [78, 194, '#f6a']].forEach(([x, y, c]) => { solid(x, y, 5, 4, c); drawRect(x + 2, y, 1, 4, '#ffe066'); });
+  structureRects.push([32, 164, 52, 36]);
+}
+function drawFrozenPond() { fillEllipse(265, 140, 28, 15, '#bfe6f5'); fillEllipse(270, 142, 22, 10, '#d8f2fc'); [[250, 134], [270, 148], [282, 138]].forEach(([x, y]) => drawRect(x, y, 6, 1, '#fff')); structureRects.push([234, 124, 62, 34]); }
+// ---- Valentine's Day ----
+function drawGazebo() {
+  solid(148, 17, 36, 15, '#f6c9d8'); drawRect(148, 17, 36, 1, '#fff'); drawRect(150, 17, 2, 15, '#fff'); drawRect(180, 17, 2, 15, '#fff');
+  gable(145, 6, 42, 12, '#ff8fb4', '#e86a97'); heart(164, 0, '#ff4a7a');
+  solid(160, 24, 12, 8, '#fff'); drawRect(161, 25, 10, 7, '#ff9ad5'); heart(163, 26, '#fff');
+  for (let y = 19; y < 31; y += 3) { drawRect(150, y, 2, 2, '#e33'); drawRect(180, y, 2, 2, '#e33'); }   // roses climbing the pillars
+  structureRects.push([144, 0, 48, 34]);
+}
+function drawHeartBed() {
+  const w = 34, h = 23, ox = 42, oy = 175, inside = (px, py) => { const x = (px / w - .5) * 2.6, y = 1.3 - (py / h) * 2.5; return ((x * x + y * y - 1) ** 3 - x * x * y ** 3) <= 0; };
+  for (let py = -1; py <= h; py++) for (let px = -1; px <= w; px++) if (!inside(px, py) && (inside(px + 1, py) || inside(px - 1, py) || inside(px, py + 1) || inside(px, py - 1))) drawRect(ox + px, oy + py, 1, 1, INK);
+  for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) if (inside(px, py)) drawRect(ox + px, oy + py, 1, 1, ((px * 7 + py * 13) % 5 === 0) ? ['#ff4a7a', '#ff9ad5', '#fff'][(px + py) % 3] : '#3a8a3a');
+  structureRects.push([40, 173, 38, 26]);
+}
+// ---- Easter ----
+function drawBurrow() {
+  fillEllipse(166, 24, 25, 11, INK); fillEllipse(166, 24, 24, 10, '#4f9a40'); fillEllipse(160, 20, 12, 5, '#68b856');
+  fillEllipse(166, 27, 4, 5, INK); fillEllipse(166, 27, 3, 4, '#8a5a30'); drawRect(168, 27, 1, 1, '#ffd84a'); drawRect(164, 25, 1, 5, '#6b4423');
+  [[150, 22, '#ff9ad5'], [156, 18, '#ffe066'], [176, 19, '#c58cff'], [182, 24, '#ff7a5a']].forEach(([x, y, c]) => { drawRect(x, y + 1, 1, 3, '#2f7d3a'); drawRect(x - 1, y, 3, 2, c); });   // tulips
+  drawRect(188, 26, 1, 8, '#6b4423'); drawRect(186, 24, 5, 3, '#f90'); drawRect(187, 22, 3, 2, '#3a3');                                       // carrot sign
+  structureRects.push([140, 12, 52, 24]);
+}
+function drawEasterEgg() {
+  fillEllipse(58, 184, 10, 13, INK); fillEllipse(58, 184, 9, 12, '#c58cff');
+  for (let x = -8; x <= 8; x++) drawRect(58 + x, 181 + ((x + 8) % 4 < 2 ? 0 : 2), 1, 2, '#fff');
+  drawRect(54, 187, 2, 2, '#ffe066'); drawRect(61, 189, 2, 2, '#ff9ad5'); drawRect(54, 175, 2, 4, 'rgba(255,255,255,.55)');
+  [26, 30, 34, 38, 42, 74, 78, 82, 86, 90].forEach((x, i) => { drawRect(x, 192, 1, 4, '#3a8a3a'); drawRect(x - 1, 189, 3, 3, ['#ff4a7a', '#ffe066', '#c58cff', '#ff9a3a', '#6ef'][i % 5]); });
+  drawRect(22, 197, 72, 1, '#fff'); for (let x = 22; x < 94; x += 4) drawRect(x, 195, 2, 4, '#fff');
+  structureRects.push([20, 174, 76, 26]);
+}
+// Animated: glowing windows, chimney smoke, twinkling star, floating hearts
+function animateHolidayStructures() {
+  const h = settings.holidays[0];
+  if (h === 'halloween') { const f = Math.max(0, .15 + .3 * Math.sin(clock * 7) * Math.sin(clock * 3.1)); [[152, 20], [166, 20]].forEach(([x, y]) => drawRect(x, y, 5, 6, `rgba(255,240,150,${f})`)); }
+  if (h === 'xmas') { if (Math.random() < .08) spawnParticle(175, 0, '#e8e8f0', -8, 2.2, 0, 2); drawRect(57, 167, 3, 3, Math.sin(clock * 6) > 0 ? '#fff7a0' : '#ffe066'); drawRect(58, 166, 1, 5, '#ffe066'); }
+  if (h === 'valentine' && Math.random() < .04) spawnParticle(166, 6, '#ff4a7a', -10, 2, 0, 2);
+}
+
 // ---- First-time setup: load saved settings, build the settings window, build the scenery ----
 loadConfig();
 buildSettingsUI();
