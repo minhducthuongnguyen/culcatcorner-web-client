@@ -49,7 +49,7 @@ button.alt{background:transparent;color:var(--fg);border:2px solid var(--fg)}
 <h3>Book series (their characters visit and leave props around the school)</h3>
 <div class="row" style="margin:0 0 6px"><button id="cfgAll" class="alt">Select all</button><button id="cfgNone" class="alt">Clear</button></div>
 <div id="seriesList" class="grid"></div>
-<h3>School holidays (costumes, decorations, weather and special events)</h3>
+<h3>School holiday (choose one: costumes, decorations, weather and special events)</h3>
 <div id="holList" class="grid"></div>
 <div class="row"><button id="cfgSave">Save</button><button id="cfgCancel" class="alt">Cancel</button></div>
 </div></div>
@@ -368,6 +368,7 @@ function updateCharacter(c, dt) {
     }
     if (c.s === 'away') {
         if (noiseMode === 'calm' && clock >= c.ret) {
+            c.late = false;
             c.s = 'go';
             c.x = c.ex;
             c.y = c.ey;
@@ -738,7 +739,7 @@ function loadConfig() {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
     if (saved) {
       settings.series = saved.series.filter(id => BOOK_SERIES.some(s => s.id === id));
-      settings.holidays = saved.holidays.filter(id => HOLIDAYS.some(h => h.id === id));
+      settings.holidays = saved.holidays.filter(id => HOLIDAYS.some(h => h.id === id)).slice(0, 1);   // only one holiday at a time
     }
   } catch (e) { /* storage unavailable: keep defaults */ }
 }
@@ -746,33 +747,56 @@ function saveConfig() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
 }
 function buildSettingsUI() {
-  const option = (group, id, name, note) =>
-    `<label class="opt"><input type="checkbox" data-group="${group}" value="${id}"><b>${name}</b><small>${note}</small></label>`;
+  // type 'checkbox' = pick any number (book series); type 'radio' = pick exactly one (holidays)
+  const option = (group, id, name, note, type = 'checkbox') =>
+    `<label class="opt"><input type="${type}" name="${group}" data-group="${group}" value="${id}"><b>${name}</b><small>${note}</small></label>`;
   byId('seriesList').innerHTML = BOOK_SERIES.map(s => option('series', s.id, s.name, BOOK_SERIES_NOTES[s.id])).join('');
-  byId('holList').innerHTML = HOLIDAYS.map(h => option('holidays', h.id, h.name, h.note)).join('');
+  byId('holList').innerHTML = option('holidays', '', 'No holiday', 'Normal school', 'radio')
+    + HOLIDAYS.map(h => option('holidays', h.id, h.name, h.note, 'radio')).join('');
   byId('cfgBtn').onclick = () => { syncChecks(); byId('modal').hidden = false; };
   byId('cfgCancel').onclick = () => { byId('modal').hidden = true; };
   byId('cfgSave').onclick = () => { readChecks(); byId('modal').hidden = true; applyConfig(); };
   byId('cfgAll').onclick = () => setAllChecked('series', true);
   byId('cfgNone').onclick = () => setAllChecked('series', false);
 }
-const allCheckboxes = () => Array.from(document.querySelectorAll('#modal input[type=checkbox]'));
-const syncChecks = () => allCheckboxes().forEach(i => { i.checked = settings[i.dataset.group].includes(i.value); });
+const allCheckboxes = () => Array.from(document.querySelectorAll('#modal input'));
+const syncChecks = () => allCheckboxes().forEach(i => { i.checked = (i.dataset.group === 'holidays' && i.value === '') ? settings.holidays.length === 0 : settings[i.dataset.group].includes(i.value); });
 const setAllChecked = (group, on) => allCheckboxes().forEach(i => { if (i.dataset.group === group) i.checked = on; });
 function readChecks() {
   ['series', 'holidays'].forEach(group => {
-    settings[group] = allCheckboxes().filter(i => i.dataset.group === group && i.checked).map(i => i.value);
+    settings[group] = allCheckboxes().filter(i => i.dataset.group === group && i.checked).map(i => i.value).filter(Boolean);
   });
 }
 
 // Apply the settings: re-colour trees, rename/clear special characters, dress everyone, rebuild the scenery
+let hhWasOn = false;
+// Send the Horrible Harry cast off screen, then let them walk back in one at a time
+// (Harry first, Doug right behind him, then Song Lee, finally Miss Mackle)
+function arriveGradually(indices) {
+  const harrySide = Math.random() < .5;
+  const delays = [randomBetween(6, 12), 0, randomBetween(20, 32), randomBetween(40, 60)];
+  delays[1] = delays[0] + randomBetween(2, 5);
+  indices.forEach((i, k) => {
+    const c = people[i];
+    releaseSpot(c); dropHeldItem(c);
+    c.s = 'away'; c.late = true; c.path = null; c.em = null; c.jx = 0; c.frz = 0;
+    const left = k < 2 ? harrySide : Math.random() < .5;
+    c.ex = left ? -14 : WIDTH + 14; c.ey = randomBetween(93, 99);
+    c.ret = clock + delays[k];
+  });
+}
 function applyConfig() {
   const h = settings.holidays;
   treeColors = h.includes('xmas') ? ['#0f3a24', '#1f6a3a', '#2f8a4a', '#185a30']
     : h.includes('thanks') ? ['#6a2f0d', '#d2691e', '#f0a030', '#a8501a']
     : h.includes('halloween') ? ['#2a1a30', '#5a3a6a', '#7a5a8a', '#3a2a4a'] : TREE_DEFAULT;
   const hh = settings.series.includes('hh');
-  [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [40, 'Miss Mackle']].forEach(([i, n]) => { people[i].name = hh ? n : null; });
+  const cast = [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [40, 'Miss Mackle']];
+  cast.forEach(([i, n]) => { people[i].name = hh ? n : null; });
+  if (hh && !hhWasOn) arriveGradually(cast.map(c => c[0]));            // just switched on: they walk in one by one
+  else if (!hh && hhWasOn) cast.forEach(([i]) => { if (people[i].s === 'away') people[i].ret = clock; });
+  hhWasOn = hh;
+  if (!h.includes('xmas')) snowCover = 0;                               // snow melts when Christmas is switched off
   people.splice(44);            // remove any visitors currently on screen
   people.forEach(giveCostume);
   rebuildWorld();
@@ -965,7 +989,6 @@ function drawHolidayDecorations() {
     bunting(['#d2691e', '#e1a400', '#a8501a']);
   }
   if (h('xmas')) {
-    for (let i = 0; i < 450; i++) drawRect(randomBetween(0, WIDTH), randomBetween(0, HEIGHT), 1, 1, '#fff');                                  // snow sparkle on the ground
     [[26, 23], [110, 23]].forEach(([x, y]) => { fillEllipse(x + 7, y + 3, 4, 3, '#1f6a3a'); drawRect(x + 6, y + 5, 2, 2, '#e33'); });   // wreaths on the windows
     [[292, 107], [299, 109]].forEach(([x, y], i) => { drawRectOutline(x, y, 5, 4); drawRect(x, y, 5, 4, ['#e33', '#39f'][i]); drawRect(x + 2, y, 1, 4, '#ffe066'); });  // presents
     drawRectOutline(228, 172, 6, 6); fillEllipse(231, 174, 5, 5, '#fff'); fillEllipse(231, 168, 4, 4, '#fff'); drawRect(230, 167, 1, 1, '#222'); drawRect(232, 167, 1, 1, '#222'); drawRect(231, 168, 3, 1, '#f90');  // snowman
@@ -979,12 +1002,63 @@ function drawHolidayDecorations() {
     for (let i = 0; i < 18; i++) { const x = 120 + r() * 190, y = 110 + r() * 80; if (((x - 265) / 32) ** 2 + ((y - 140) / 19) ** 2 < 1) continue; drawRect(x, y, 2, 3, ['#ff9ad5', '#6ef', '#ffe066', '#c58cff'][i % 4]); drawRect(x, y + 1, 2, 1, '#fff'); }
   }
 }
-function drawExtraScenery() { drawBookProps(); }
+function drawExtraScenery() {
+  drawBookProps();
+  // Christmas: remember which pixels are ground, so snow can pile up there later
+  if (settings.holidays.includes('xmas')) buildSnowMask(); else snowThreshold = null;
+}
+
+/* ---------- Christmas snow that slowly piles up on the ground ---------- */
+const SNOW_BLOCK = 2;                                // snow is painted in 2x2 pixel blocks
+const SNOW_COLS = WIDTH / SNOW_BLOCK, SNOW_ROWS = HEIGHT / SNOW_BLOCK;
+const SNOW_SECONDS = 240;                            // how long until the ground is completely white
+let snowCover = 0;                                   // 0 = bare ground ... 1 = fully covered
+let snowThreshold = null;                            // per block: the coverage at which it turns white (2 = never, not ground)
+let snowDrawnStep = -1;                              // last coverage step we painted (so we only repaint when it changes)
+const snowCanvas = document.createElement('canvas');
+snowCanvas.width = WIDTH;
+snowCanvas.height = HEIGHT;
+
+// Is this background pixel grass or path (snow can settle) rather than a building, water, etc.?
+function isGroundPixel(r, g, b, x, y) {
+  const insideBuilding = (x > 13 && x < 137 && y > 10 && y < 96) || (x > 193 && x < 307 && y > 7 && y < 79);
+  if (insideBuilding) return false;
+  const grass = g > r + 12 && g > b + 25;
+  const path = r > 165 && g > 145 && b > 95 && r - b > 40;
+  return grass || path;
+}
+function buildSnowMask() {
+  const pixels = backgroundCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT).data;
+  snowThreshold = new Float32Array(SNOW_COLS * SNOW_ROWS).fill(2);
+  for (let by = 0; by < SNOW_ROWS; by++) {
+    for (let bx = 0; bx < SNOW_COLS; bx++) {
+      const x = bx * SNOW_BLOCK, y = by * SNOW_BLOCK, i = (y * WIDTH + x) * 4;
+      if (isGroundPixel(pixels[i], pixels[i + 1], pixels[i + 2], x, y)) snowThreshold[by * SNOW_COLS + bx] = Math.random();
+    }
+  }
+  snowDrawnStep = -1;
+}
+function drawSnowCover() {
+  if (!snowThreshold) return;
+  const step = Math.floor(snowCover * 60);
+  if (step !== snowDrawnStep) {                       // repaint the snow layer only when the coverage grew a little
+    snowDrawnStep = step;
+    const sc = snowCanvas.getContext('2d');
+    sc.clearRect(0, 0, WIDTH, HEIGHT);
+    for (let i = 0; i < snowThreshold.length; i++) {
+      if (snowThreshold[i] >= snowCover) continue;
+      sc.fillStyle = i % 5 === 0 ? '#dfe9f6' : '#f6f9ff';
+      sc.fillRect((i % SNOW_COLS) * SNOW_BLOCK, Math.floor(i / SNOW_COLS) * SNOW_BLOCK, SNOW_BLOCK, SNOW_BLOCK);
+    }
+  }
+  ctx.drawImage(snowCanvas, 0, 0);
+}
 
 /* ---------- Things that move in the scene (drawn before characters) ---------- */
 const bulb = (x, y) => drawRect(x, y, 2, 2, ['#e33', '#fd3', '#3a3', '#39f'][(Math.floor(clock * 2) + (x >> 3)) % 4]);
 function butterfly(x, y, c) { const f = Math.sin(clock * 18 + x) > 0 ? 1 : 0; drawRect(x - 2, y - f, 2, 2, c); drawRect(x + 1, y - f, 2, 2, c); drawRect(x, y, 1, 2, '#222'); }
 function drawAnimatedScenery() {
+  drawSnowCover();
   [0, 1, 2].forEach(i => butterfly(60 + Math.cos(clock * .5 + i * 2) * 40, 138 + Math.sin(clock * .7 + i * 2) * 25, ['#ff9ad5', '#ffe066', '#6ef'][i]));
   if (settings.series.includes('frog')) [[238, 131], [286, 152]].forEach(([x, y], i) => {          // frogs hopping by the pond
     const hop = Math.max(0, Math.sin(clock * 2.5 + i * 3)) * 3;
@@ -1129,6 +1203,7 @@ addSpecialEvent('egghunt', { text: 'Easter egg hunt!', dur: 16, emo: ['star', 's
 /* ---------- Called every frame: visitors, purge, holiday weather ---------- */
 function updateVisitorsAndWeather(dt) {
   removeFinishedVisitors();
+  if (settings.holidays.includes('xmas')) snowCover = Math.min(1, snowCover + dt / SNOW_SECONDS);   // snow piles up
   if (noiseMode === 'calm') { visitCountdown -= dt; if (visitCountdown <= 0) { visitCountdown = randomBetween(35, 70); startVisit(); } }
   const h = id => settings.holidays.includes(id), drift = (c, s, vx, vy, y, t = 14) => particles.push({ x: randomBetween(0, WIDTH), y, vx, vy, t, m: t, c, g: 0, s });
   if (h('xmas') && Math.random() < dt * 10) drift('#fff', Math.random() < .3 ? 2 : 1, randomBetween(-4, 4), randomBetween(10, 18), -3);                       // snow
@@ -2091,6 +2166,21 @@ let lastFrameTime = performance.now();
 let bannerText = '';
 let bannerClass = '';
 let infoText = '';
+// Turn seconds into "45s", "3m 05s" or "1h 02m 09s" for the quiet counter
+function formatDuration(totalSeconds) {
+    const t = Math.floor(totalSeconds);
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const sec = t % 60;
+    const two = n => String(n).padStart(2, '0');
+    if (h > 0) {
+        return `${h}h ${two(m)}m ${two(sec)}s`;
+    }
+    if (m > 0) {
+        return `${m}m ${two(sec)}s`;
+    }
+    return `${sec}s`;
+}
 function gameLoop(now) {
     const dt = Math.min(.05, (now - lastFrameTime) / 1000);
     lastFrameTime = now;
@@ -2137,7 +2227,7 @@ function gameLoop(now) {
             onCalm();
         }
     }
-    const away = people.filter(c => !c.guest && (c.s === 'away' || c.s === 'flee')).length;
+    const away = people.filter(c => !c.guest && !c.late && (c.s === 'away' || c.s === 'flee')).length;
     if (noiseMode === 'calm') {
         quietTime += dt;
         if (!away && !currentEvent) {
@@ -2191,7 +2281,7 @@ function gameLoop(now) {
     byId('lv').style.width = Math.min(100, noiseLevel) + '%';
     byId('mk').style.left = th + '%';
     byId('wk').style.left = th * .7 + '%';
-    const s = `Quiet ${Math.floor(quietTime)}s  At school ${44 - away}/44`;
+    const s = `Quiet ${formatDuration(quietTime)}  At school ${44 - away - people.filter(c => c.late && c.s === 'away').length}/44`;
     if (s !== infoText) {
         infoText = s;
         byId('info').textContent = s;
