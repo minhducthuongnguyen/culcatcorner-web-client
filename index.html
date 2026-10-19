@@ -116,7 +116,7 @@ function fillEllipse(cx, cy, rx, ry, c) {
     }
 }
 // ---- Tiny pixel emoji: each icon is 7x7 characters, letters map to the colours in PAL ----
-const PIXEL_COLORS = { r: '#e33', y: '#fd3', b: '#39f', w: '#fff', k: '#222', p: '#f6a', g: '#3a3', o: '#e92', c: '#6ef', u: '#85f' };
+const PIXEL_COLORS = { r: '#e33', y: '#fd3', b: '#39f', w: '#fff', k: '#222', p: '#f6a', g: '#3a3', o: '#e92', c: '#6ef', u: '#85f', n: '#a0702a', t: '#d9c38f' };
 const EMOJI_ICONS = {
     heart: ['.......', '.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'],
     star: ['...y...', '...y...', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', '.y...y.'],
@@ -127,7 +127,9 @@ const EMOJI_ICONS = {
     excl: ['...r...', '...r...', '...r...', '...r...', '...r...', '.......', '...r...'],
     sweat: ['...b...', '..bbb..', '.bbbbb.', '.bbwbb.', '..bbb..', '.......', '.......'],
     book: ['.......', 'rrr.ooo', 'rrr.ooo', 'rrr.ooo', 'rrr.ooo', 'rrr.ooo', '.......'],
-    flower: ['..ppp..', '.ppypp.', '..ppp..', '...g...', '..gg...', '...g...', '.......']
+    flower: ['..ppp..', '.ppypp.', '..ppp..', '...g...', '..gg...', '...g...', '.......'],
+    zzz: ['.bbbb..', '...b...', '..b....', '.bbbb..', '....bb.', '.....b.', '....bb.'],
+    bone: ['.......', 'tt...tt', 'ttttttt', 'ttttttt', 'tt...tt', '.......', '.......']
 };
 // Items characters carry: [colour, width, height, highlight colour]
 const ITEM_SPRITES = { can: ['#4aa3ff', 3, 2, '#bfe0ff'], book: ['#c33', 3, 3, '#fff'], wand: ['#8b5a2b', 1, 4, '#ffe066'], poster: ['#ff7ab8', 3, 3, '#fff'], mask: ['#fff', 3, 3, '#222'], bread: ['#e0b070', 2, 2, '#fff'] };
@@ -716,7 +718,7 @@ const BOOK_SERIES = [
 const BOOK_SERIES_NOTES = {
   mth: 'Tree house in the trees, Jack and Annie visit', hh: 'Harry, Doug, Song Lee stay; ants, slime, mud', pete: 'Big white sneakers, Pete dances',
   arthur: 'Ice-cream cart, Arthur and friends', junie: 'Bus-stop sign, Junie B. visits', frog: 'Hopping frogs by the pond',
-  eleph: 'Balloons, Gerald and Piggie', dogman: 'Doghouse, Dog Man and Petey',
+  eleph: 'Balloons, Gerald and Piggie', dogman: 'Dog Man and Petey',
 };
 
 // ---- Holidays: costumes for people, decorations, weather and special events ----
@@ -949,7 +951,6 @@ function drawBookProps() {
   if (on('pete')) [[118, 112], [125, 112]].forEach(([x, y]) => { drawRectOutline(x, y, 6, 4); drawRect(x, y, 6, 4, '#fff'); drawRect(x, y + 3, 6, 1, '#d33'); drawRect(x + 1, y + 1, 2, 1, '#39f'); });
   if (on('arthur')) { drawRectOutline(203, 78, 12, 8); drawRect(203, 78, 12, 8, '#ff9ac0'); drawRect(203, 78, 12, 2, '#fff'); drawRect(205, 81, 3, 4, '#fff'); drawRect(209, 81, 3, 4, '#c98a4a'); drawRect(205, 75, 8, 3, '#e33'); }  // ice-cream cart
   if (on('junie')) { drawRect(302, 106, 2, 8, '#6b4423'); drawRectOutline(298, 100, 10, 6); drawRect(298, 100, 10, 6, '#ffd84a'); drawRect(300, 102, 6, 2, '#222'); }  // bus stop sign
-  if (on('dogman')) { drawRectOutline(270, 174, 14, 9); drawRect(270, 174, 14, 9, '#c0392b'); drawRect(268, 171, 18, 3, '#222'); drawRect(274, 177, 6, 6, '#2a1a14'); }  // doghouse
   drawHolidayDecorations();
 }
 function blockPropCells() {
@@ -958,7 +959,6 @@ function blockPropCells() {
   if (on('pete')) blockRect(117, 111, 16, 6);
   if (on('arthur')) blockRect(202, 77, 14, 10);
   if (on('junie')) blockRect(301, 108, 4, 6);
-  if (on('dogman')) blockRect(269, 170, 16, 13);
   if (h('thanks')) { blockRect(118, 160, 14, 8); blockRect(204, 164, 14, 8); }
   if (h('xmas')) blockRect(226, 168, 10, 12);
 }
@@ -2090,6 +2090,7 @@ function drawOverlay() {
         bubble(Math.round(c.x + c.jx) - 3, Math.round(c.y) - (c.tc ? 31 : 25) - rise, e.i);
         ctx.globalAlpha = 1;
     });
+    drawSnoopyBubble();
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.t -= .016;
@@ -2192,6 +2193,7 @@ function drawFrame() {
         }
     });
     TREES.forEach(t => L.push([t[1], () => drawTree(t[0], t[1])]));
+    L.push([snoopyDepth(), drawSnoopy]);
     L.push([90, drawClassroomFront]);
     L.sort((a, b) => a[0] - b[0]);
     L.forEach(o => o[1]());
@@ -2273,11 +2275,11 @@ function animateSceneDetail() {
 const ITEM_EXTRA = Object.assign(ITEM_SPRITES, { candy: ['#f90', 2, 2, '#fff'], corn: ['#ffd84a', 2, 4, '#3a3'] });
 // Visitors' favourite spots at each holiday's structures (students walk there, carry an item and show emoji)
 const LANDMARKS = {
-  halloween: { item: 'candy', emo: ['excl', 'sweat', 'smile'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [32, 193], [56, 193], [80, 193]] },
-  thanks: { item: 'corn', emo: ['smile', 'heart', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [30, 194], [46, 194], [78, 194]] },
-  xmas: { item: 'gift', emo: ['star', 'smile', 'heart'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [30, 190], [86, 190], [34, 197]] },
-  valentine: { item: 'card', emo: ['heart', 'smile', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [34, 188], [84, 188], [36, 197]] },
-  easter: { item: 'egg', emo: ['flower', 'smile', 'star'], spots: [[148, 37], [156, 37], [176, 37], [184, 37], [34, 192], [84, 192], [58, 197]] },
+  halloween: { item: 'candy', emo: ['excl', 'sweat', 'smile'], spots: [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37], [32, 193], [56, 193], [80, 193]] },
+  thanks: { item: 'corn', emo: ['smile', 'heart', 'star'], spots: [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37], [30, 194], [46, 194], [78, 194]] },
+  xmas: { item: 'gift', emo: ['star', 'smile', 'heart'], spots: [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37], [30, 190], [86, 190], [34, 197]] },
+  valentine: { item: 'card', emo: ['heart', 'smile', 'star'], spots: [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37], [34, 188], [84, 188], [36, 197]] },
+  easter: { item: 'egg', emo: ['flower', 'smile', 'star'], spots: [[244, 174], [256, 174], [148, 37], [156, 37], [176, 37], [184, 37], [34, 192], [84, 192], [58, 197]] },
 };
 function setupHolidayActivity() {
   people.forEach(c => { if (c.act === 'landmark') { releaseSpot(c); c.item = null; c.s = 'idle'; c.w = 1; } });
@@ -2287,6 +2289,8 @@ function setupHolidayActivity() {
 }
 function blockHolidayStructures() {
   const h = settings.holidays[0];
+  blockRect(289, 182, 18, 13);                 // Snoopy's doghouse
+  blockMoreHolidayStructures(h);
   if (h === 'halloween') { blockRect(144, 18, 42, 15); [26, 38, 50, 62, 74, 86].forEach((x, i) => blockRect(x, 184 + (i % 2) * 2, 7, 5)); blockRect(89, 189, 7, 6); }
   if (h === 'thanks') { blockRect(144, 18, 44, 15); blockRect(56, 184, 4, 10); }
   if (h === 'xmas') { blockRect(144, 18, 44, 15); blockRect(44, 172, 28, 22); }
@@ -2296,6 +2300,8 @@ function blockHolidayStructures() {
 function drawHolidayStructures() {
   structureRects.length = 0;
   const h = settings.holidays[0];
+  drawSnoopyHouse();
+  drawMoreHolidayStructures(h);
   if (h === 'halloween') { drawHauntedHouse(); drawGraveyard(); }
   if (h === 'thanks') { drawBarn(); drawCornfield(); }
   if (h === 'xmas') { drawWorkshop(); drawGiantTree(); drawFrozenPond(); }
@@ -2399,6 +2405,470 @@ function animateHolidayStructures() {
   if (h === 'halloween') { const f = Math.max(0, .15 + .3 * Math.sin(clock * 7) * Math.sin(clock * 3.1)); [[152, 20], [166, 20]].forEach(([x, y]) => drawRect(x, y, 5, 6, `rgba(255,240,150,${f})`)); }
   if (h === 'xmas') { if (Math.random() < .08) spawnParticle(175, 0, '#e8e8f0', -8, 2.2, 0, 2); drawRect(57, 167, 3, 3, Math.sin(clock * 6) > 0 ? '#fff7a0' : '#ffe066'); drawRect(58, 166, 1, 5, '#ffe066'); }
   if (h === 'valentine' && Math.random() < .04) spawnParticle(166, 6, '#ff4a7a', -10, 2, 0, 2);
+  animateMoreStructures(h);
+}
+
+/* ---------- More holiday structures ----------
+ * Every holiday gets three extra buildings on top of the two big ones above:
+ *   C = bottom-middle (x 236-264, y 168-198)     D = right-hand edge (x 298-320, y 112-136)
+ *   F = top-right corner, a tall slim landmark (x 304-320, y 6-50)
+ * They are painted once into the background and kept clear of every activity spot. */
+function drawMoreHolidayStructures(h) {
+  if (h === 'halloween') { drawWitchCauldron(); drawCandyStall(); drawSpookyTree(); }
+  if (h === 'thanks') { drawFeastTable(); drawHayWagon(); drawMapleTree(); }
+  if (h === 'xmas') { drawSantaSleigh(); drawGingerbreadHouse(); drawNutcracker(); }
+  if (h === 'valentine') { drawHeartFountain(); drawHeartMailbox(); drawCupidStatue(); }
+  if (h === 'easter') { drawRabbitHutch(); drawFlowerArch(); drawEggTree(); }
+}
+function blockMoreHolidayStructures(h) {
+  if (h === 'halloween') { blockRect(240, 180, 20, 16); blockRect(300, 122, 18, 10); blockRect(310, 40, 5, 8); }
+  if (h === 'thanks') { blockRect(238, 180, 26, 16); blockRect(299, 118, 20, 14); blockRect(310, 40, 5, 7); }
+  if (h === 'xmas') { blockRect(239, 180, 24, 14); blockRect(299, 123, 18, 10); blockRect(308, 38, 11, 10); }
+  if (h === 'valentine') { blockRect(240, 178, 20, 16); blockRect(307, 124, 5, 10); blockRect(309, 38, 10, 8); }
+  if (h === 'easter') { blockRect(238, 182, 26, 13); blockRect(301, 118, 2, 14); blockRect(315, 118, 2, 14); blockRect(310, 40, 5, 7); }
+}
+// Small helper: a 1px-wide vertical or diagonal line of pixels
+function pixelLine(x1, y1, x2, y2, color) {
+  const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+  for (let i = 0; i <= steps; i++) drawRect(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, 1, 1, color);
+}
+
+// ---- Halloween ----
+function drawWitchCauldron() {
+  drawRect(240, 194, 20, 2, '#5a3a1e'); drawRect(243, 192, 14, 2, '#7a4a24');                          // fire logs
+  fillEllipse(250, 187, 10, 7, INK); fillEllipse(250, 187, 9, 6, '#2a2a34'); drawRect(244, 184, 3, 4, '#44444f');
+  drawRect(241, 193, 2, 3, INK); drawRect(257, 193, 2, 3, INK);                                        // legs
+  fillEllipse(250, 181, 9, 3, INK); fillEllipse(250, 181, 8, 2, '#3a3a46'); fillEllipse(250, 181, 7, 1, '#6fe05a');   // rim + green brew
+  pixelLine(262, 197, 266, 176, '#8b5a2b'); drawRect(260, 193, 6, 5, '#d9b45a'); drawRect(260, 195, 6, 1, '#b8923a');   // broomstick
+  structureRects.push([236, 172, 32, 28]);
+}
+function drawCandyStall() {
+  solid(302, 123, 15, 8, '#6b4423'); drawRect(302, 123, 15, 1, '#8a5a30');                              // counter
+  drawRect(302, 118, 1, 6, '#4a2e16'); drawRect(316, 118, 1, 6, '#4a2e16');                             // posts
+  for (let i = 0; i < 18; i++) drawRect(300 + i, 113, 1, 5, i % 4 < 2 ? '#f08a1a' : '#2a1a3a');          // striped awning
+  drawRect(300, 112, 18, 1, INK); drawRect(300, 118, 18, 1, INK);
+  fillEllipse(307, 122, 3, 2, '#fff'); [[305, 121, '#f6a'], [307, 120, '#6ef'], [308, 122, '#ffd84a']].forEach(([x, y, c]) => drawRect(x, y, 1, 1, c));   // candy bowl
+  solid(311, 120, 4, 3, '#f08a1a'); drawRect(312, 119, 1, 1, '#3a8a2a');                                // pumpkin
+  structureRects.push([298, 110, 22, 24]);
+}
+function drawSpookyTree() {
+  drawRect(311, 22, 3, 24, INK); drawRect(311, 26, 3, 20, '#3a2a1e'); drawRect(311, 26, 1, 20, '#5a4030');   // trunk
+  [[306, 24, 6, 2], [306, 19, 2, 6], [314, 20, 6, 2], [318, 14, 2, 7], [308, 14, 2, 6], [312, 13, 2, 9], [315, 28, 4, 2], [318, 26, 2, 3]].forEach(([x, y, w, hh]) => { drawRect(x - 1, y - 1, w + 2, hh + 2, INK); });
+  [[306, 24, 6, 2], [306, 19, 2, 6], [314, 20, 6, 2], [318, 14, 2, 7], [308, 14, 2, 6], [312, 13, 2, 9], [315, 28, 4, 2], [318, 26, 2, 3]].forEach(([x, y, w, hh]) => drawRect(x, y, w, hh, '#3a2a1e'));
+  fillEllipse(312, 35, 3, 4, '#120a1c');                                                                // hollow
+  drawRect(309, 46, 3, 1, '#3a2a1e'); drawRect(314, 46, 3, 1, '#3a2a1e');                                // roots
+  structureRects.push([304, 10, 16, 40]);
+}
+
+// ---- Thanksgiving ----
+function drawFeastTable() {
+  solid(238, 181, 26, 9, '#c9a46a'); drawRect(238, 183, 26, 2, '#b0431f');                              // table cloth + runner
+  drawRect(240, 190, 2, 3, '#6b4423'); drawRect(260, 190, 2, 3, '#6b4423');
+  solid(238, 193, 26, 3, '#8a5a3a'); drawRect(240, 196, 2, 2, '#6b4423'); drawRect(260, 196, 2, 2, '#6b4423');   // bench
+  fillEllipse(251, 181, 5, 3, INK); fillEllipse(251, 181, 4, 2, '#b8692a'); drawRect(247, 180, 2, 2, '#e8b45a'); drawRect(254, 180, 2, 2, '#e8b45a');   // roast turkey
+  fillEllipse(242, 182, 3, 2, '#e8b45a'); drawRect(241, 181, 2, 1, '#fff3c0');                           // pie
+  fillEllipse(246, 182, 2, 1, '#c0392b'); drawRect(258, 181, 4, 1, '#ffd84a'); drawRect(258, 182, 4, 1, '#d9b24a');   // cranberries, corn
+  drawRect(254, 177, 1, 3, '#fff');                                                                      // candle
+  structureRects.push([236, 172, 30, 28]);
+}
+function drawHayWagon() {
+  drawRect(296, 128, 4, 1, '#6b4423');                                                                   // pull bar
+  solid(300, 122, 19, 7, '#8a5a3a'); drawRect(300, 122, 19, 1, '#a06a3a');
+  solid(301, 117, 17, 6, '#d9b45a'); for (let i = 0; i < 17; i += 3) drawRect(301 + i, 117, 1, 6, '#b8923a');   // hay
+  fillEllipse(306, 117, 3, 2, INK); fillEllipse(306, 117, 2, 1, '#f08a1a'); fillEllipse(313, 116, 3, 2, INK); fillEllipse(313, 116, 2, 1, '#e8861a');   // pumpkins on top
+  [[305, 131], [314, 131]].forEach(([x, y]) => { fillEllipse(x, y, 4, 4, INK); fillEllipse(x, y, 3, 3, '#6b4423'); drawRect(x, y, 1, 1, '#d9b45a'); });   // wheels
+  structureRects.push([294, 112, 26, 24]);
+}
+function drawMapleTree() {
+  solid(311, 32, 3, 14, '#6b4423'); drawRect(311, 32, 1, 14, '#8a5a30');
+  [[312, 22, 8, 9], [307, 27, 5, 4], [318, 27, 4, 4], [312, 14, 5, 5]].forEach(([x, y, rx, ry]) => fillEllipse(x, y, rx + 1, ry + 1, INK));
+  [[312, 22, 8, 9, '#d2691e'], [307, 27, 5, 4, '#c0392b'], [318, 27, 4, 4, '#e8861a'], [312, 14, 5, 5, '#e8a02a']].forEach(([x, y, rx, ry, c]) => fillEllipse(x, y, rx, ry, c));
+  [[309, 18], [315, 24], [311, 28], [316, 16], [307, 24]].forEach(([x, y], i) => drawRect(x, y, 2, 2, ['#f0b040', '#b03a1a', '#e8a02a'][i % 3]));
+  fillEllipse(312, 46, 6, 2, '#e8861a'); drawRect(308, 45, 2, 1, '#c0392b'); drawRect(314, 46, 3, 1, '#e8b02a');   // leaf pile
+  structureRects.push([304, 6, 16, 42]);
+}
+
+// ---- Christmas ----
+function drawSantaSleigh() {
+  drawRect(238, 194, 27, 1, '#d9b24a'); drawRect(263, 191, 2, 4, '#d9b24a'); drawRect(264, 190, 1, 1, '#d9b24a');   // runners
+  solid(240, 184, 22, 8, '#c0392b'); drawRect(240, 184, 22, 1, '#fff'); drawRect(240, 190, 22, 1, '#8f2a20');
+  solid(260, 181, 3, 8, '#c0392b'); drawRect(241, 188, 20, 1, '#d9b24a');                                // curved front, gold trim
+  fillEllipse(247, 181, 6, 5, INK); fillEllipse(247, 181, 5, 4, '#7a4a2a'); drawRect(243, 178, 5, 1, '#d9b24a');   // toy sack
+  [[250, 177, 5, 5, '#2a7ad0'], [255, 179, 4, 4, '#3a9a4a'], [243, 173, 5, 5, '#f6a']].forEach(([x, y, w, hh, c]) => { solid(x, y, w, hh, c); drawRect(x + (w >> 1), y, 1, hh, '#ffe066'); });
+  structureRects.push([236, 170, 32, 28]);
+}
+function drawGingerbreadHouse() {
+  solid(301, 123, 15, 9, '#b8743a'); for (let x = 302; x < 316; x += 3) drawRect(x, 123, 1, 9, '#9a5a28');
+  gable(299, 114, 19, 10, '#fff', '#dfe9f6');
+  drawRect(299, 123, 19, 1, '#fff');
+  solid(306, 126, 4, 6, '#7a4a2a'); glowWindow(302, 126, 3, 3, '#ffd84a', '#8a5a1a'); glowWindow(311, 126, 3, 3, '#ffd84a', '#8a5a1a');
+  [[303, 119, '#e33'], [308, 117, '#3a3'], [313, 119, '#f6a'], [310, 121, '#39f']].forEach(([x, y, c]) => drawRect(x, y, 1, 1, c));   // gumdrops
+  [297, 318].forEach(x => { for (let y = 126; y < 133; y++) drawRect(x, y, 1, 1, y % 2 ? '#fff' : '#e33'); drawRect(x + 1, 125, 1, 1, '#e33'); });   // candy canes
+  structureRects.push([295, 112, 26, 22]);
+}
+function drawNutcracker() {
+  solid(308, 46, 11, 2, '#6b4423');                                                                      // stand
+  solid(310, 40, 3, 6, '#fff'); solid(314, 40, 3, 6, '#fff'); drawRect(310, 45, 3, 1, INK); drawRect(314, 45, 3, 1, INK);
+  solid(309, 26, 9, 14, '#c0392b'); drawRect(309, 34, 9, 1, '#222'); drawRect(312, 35, 3, 1, '#ffd84a');
+  [28, 30, 32].forEach(y => drawRect(313, y, 1, 1, '#ffd84a'));                                          // gold buttons
+  solid(306, 27, 3, 9, '#c0392b'); solid(318, 27, 3, 9, '#c0392b'); drawRect(306, 36, 3, 2, '#fff'); drawRect(318, 36, 3, 2, '#fff');
+  solid(310, 19, 7, 7, '#f1c9a0'); drawRect(311, 22, 1, 1, '#222'); drawRect(315, 22, 1, 1, '#222'); drawRect(311, 24, 5, 2, '#fff');
+  solid(309, 10, 9, 9, '#2a4aa0'); drawRect(309, 17, 9, 1, '#ffd84a'); drawRect(312, 8, 3, 3, '#fff');
+  structureRects.push([304, 6, 18, 44]);
+}
+
+// ---- Valentine's Day ----
+function drawHeartFountain() {
+  fillEllipse(250, 190, 12, 6, INK); fillEllipse(250, 190, 11, 5, '#e6e6f0'); fillEllipse(250, 189, 9, 3, '#8fd3ff');
+  solid(248, 178, 5, 10, '#f6c9d8'); drawRect(247, 187, 7, 2, '#f6c9d8');
+  heart(247, 171, '#ff4a7a'); heart(248, 172, '#ff7aa5');
+  structureRects.push([236, 166, 28, 32]);
+}
+function drawHeartMailbox() {
+  solid(308, 124, 3, 10, '#7a4a2a');
+  solid(303, 115, 14, 10, '#e33'); drawRect(303, 115, 14, 1, '#ff6a6a'); heart(308, 118, '#fff');
+  drawRect(305, 112, 4, 3, '#fff'); drawRect(310, 113, 4, 2, '#ffd0e0');                                  // letters peeking out
+  drawRect(317, 112, 1, 6, '#fff'); drawRect(318, 112, 2, 2, '#ffd84a');                                  // flag
+  structureRects.push([300, 110, 22, 26]);
+}
+function drawCupidStatue() {
+  solid(309, 40, 10, 6, '#d9d9e8'); heart(312, 41, '#ff4a7a');
+  drawRect(307, 24, 4, 9, '#fff'); drawRect(317, 24, 4, 9, '#fff'); drawRect(308, 25, 2, 5, '#e8e8f4'); drawRect(318, 25, 2, 5, '#e8e8f4');   // wings
+  solid(312, 28, 4, 12, '#f6e3d8'); solid(312, 22, 4, 5, '#f6e3d8'); drawRect(312, 21, 4, 1, '#ffd84a');
+  drawRect(320, 26, 1, 11, '#8a5a30'); pixelLine(320, 26, 318, 30, '#8a5a30'); drawRect(316, 31, 4, 1, '#fff');   // bow and arrow
+  structureRects.push([304, 14, 18, 34]);
+}
+
+// ---- Easter ----
+function drawRabbitHutch() {
+  solid(240, 186, 22, 9, '#c9a06a'); for (let x = 242; x < 262; x += 4) drawRect(x, 186, 1, 9, '#a8804a');
+  solid(238, 181, 26, 5, '#8a5a30'); drawRect(238, 181, 26, 1, '#a8804a'); drawRect(240, 195, 2, 3, '#6b4423'); drawRect(260, 195, 2, 3, '#6b4423');
+  solid(243, 188, 8, 6, '#2a1a14');                                                                      // mesh door
+  for (let x = 244; x < 251; x += 2) drawRect(x, 188, 1, 6, '#9a8a6a'); for (let y = 190; y < 194; y += 2) drawRect(243, y, 8, 1, '#9a8a6a');
+  [[254, 196, '#ff9a3a'], [257, 197, '#ff9a3a'], [260, 196, '#ff9a3a']].forEach(([x, y, c]) => { drawRect(x, y, 2, 2, c); drawRect(x, y - 1, 2, 1, '#3a9a3a'); });   // carrots
+  structureRects.push([236, 176, 30, 24]);
+}
+function drawFlowerArch() {
+  solid(301, 118, 2, 14, '#fff'); solid(315, 118, 2, 14, '#fff');
+  solid(301, 115, 16, 3, '#fff'); drawRect(303, 113, 12, 2, '#fff'); drawRect(305, 112, 8, 1, INK);
+  const blossoms = ['#ff9ad5', '#ffe066', '#c58cff', '#ff7a5a'];
+  for (let i = 0; i < 10; i++) { drawRect(301 + i * 1.7, 113 + Math.abs(i - 4.5) * .4, 2, 2, blossoms[i % 4]); drawRect(301 + i * 1.7 + 1, 112, 1, 1, '#3a9a3a'); }
+  for (let y = 119; y < 131; y += 3) { drawRect(300, y, 2, 2, blossoms[y % 4]); drawRect(316, y + 1, 2, 2, blossoms[(y + 1) % 4]); }
+  structureRects.push([298, 108, 22, 26]);
+}
+function drawEggTree() {
+  solid(311, 32, 3, 14, '#6b4423');
+  [[312, 22, 8, 9], [307, 27, 5, 4], [318, 27, 4, 4], [312, 14, 5, 5]].forEach(([x, y, rx, ry]) => fillEllipse(x, y, rx + 1, ry + 1, INK));
+  [[312, 22, 8, 9], [307, 27, 5, 4], [318, 27, 4, 4], [312, 14, 5, 5]].forEach(([x, y, rx, ry]) => fillEllipse(x, y, rx, ry, '#66b455'));
+  [[309, 16, '#ff9ad5'], [315, 18, '#6ef'], [310, 23, '#ffe066'], [316, 25, '#c58cff'], [306, 28, '#ff7a5a'], [319, 29, '#ff9ad5'], [312, 29, '#6ef'], [313, 12, '#ffe066']]
+    .forEach(([x, y, c]) => { drawRect(x, y, 2, 3, c); drawRect(x, y + 1, 2, 1, '#fff'); });             // painted eggs
+  solid(307, 44, 9, 4, '#c98a4a'); drawRect(308, 43, 2, 1, '#ff9ad5'); drawRect(311, 42, 2, 2, '#6ef'); drawRect(314, 43, 1, 1, '#ffe066');   // basket
+  structureRects.push([304, 6, 16, 44]);
+}
+
+// Animated parts of the extra structures (called every frame from animateHolidayStructures)
+function animateMoreStructures(h) {
+  if (h === 'halloween') {
+    for (let i = 0; i < 5; i++) drawRect(243 + i * 3.5, 191 - (Math.sin(clock * 9 + i * 2) > 0 ? 1 : 0), 2, 3, i % 2 ? '#ffd84a' : '#ff9a1a');   // fire
+    if (Math.random() < .1) spawnParticle(250 + randomBetween(-5, 5), 181, '#9cff7a', -9, .9, 0, 2);                                            // bubbling brew
+    if (Math.sin(clock * 1.3) > -.9) { drawRect(310, 34, 1, 2, '#ffe14a'); drawRect(314, 34, 1, 2, '#ffe14a'); }                              // owl eyes in the hollow
+  }
+  if (h === 'thanks') {
+    drawRect(254, 176, 1, 1, Math.sin(clock * 12) > 0 ? '#ffd84a' : '#ff9a1a');
+    if (Math.random() < .05) spawnParticle(312 + randomBetween(-6, 6), 28, pickOne(['#d2691e', '#e8a02a', '#c0392b']), 8, 2.5, 0, 2);
+  }
+  if (h === 'xmas') {
+    for (let i = 0; i < 6; i++) bulb(240 + i * 4, 182 + (i % 2));
+    drawRect(302, 126, 3, 3, Math.sin(clock * 3) > 0 ? '#fff7a0' : '#ffd84a');
+    if (Math.random() < .03) spawnParticle(313, 6, '#fff', 6, 2, 0, 2);
+  }
+  if (h === 'valentine') {
+    if (Math.random() < .45) spawnParticle(250, 176, '#8fd3ff', -14, .7, 45, 1);                                                                 // fountain spray
+    if (Math.random() < .03) spawnParticle(314 + randomBetween(-4, 4), 22, '#ff4a7a', -10, 2, 0, 2);
+    if (Math.random() < .02) spawnParticle(310, 112, '#fff', -8, 1.5, 0, 2);
+  }
+  if (h === 'easter') {
+    [[250, 192, 1], [256, 193, -1]].forEach(([x, y, d], i) => {                                                                                   // two bunnies by the hutch
+      const hop = Math.max(0, Math.sin(clock * 3 + i * 2)) * 2 | 0;
+      drawOutlined(() => { drawRect(x - 3, y - 4 - hop, 6, 4, i ? '#c9a06a' : '#fff'); drawRect(x + d * 2, y - 7 - hop, 3, 3, i ? '#c9a06a' : '#fff'); drawRect(x + d * 2, y - 10 - hop, 1, 3, i ? '#c9a06a' : '#fff'); drawRect(x + d * 4, y - 10 - hop, 1, 3, i ? '#c9a06a' : '#fff'); drawRect(x + d * 3, y - 6 - hop, 1, 1, '#222'); });
+    });
+    if (Math.random() < .05) spawnParticle(309, 118, '#ffb0d0', 6, 2, 0, 2);
+  }
+}
+
+/* =====================================================================
+ * SNOOPY AND HIS RED DOGHOUSE (lower right corner)
+ * ---------------------------------------------------------------------
+ * Snoopy sleeps on the ridge of his doghouse. Every so often he wakes,
+ * hops down and visits 2-3 characters (students, teachers, story visitors):
+ *   pet    sits next to them, hearts float up
+ *   dance  does the Snoopy dance, everyone close by stops to watch
+ *   steal  grabs the item they carry and runs home with it
+ * then trots back, hops on the roof and goes back to sleep.
+ * When the class is too noisy he hides inside the doghouse.
+ * His little yellow friend Woodstock sits on his tummy or flutters around him.
+ *
+ * States: sleep, wake, hopDown, go, act, run, return, hopUp, scared, hide
+ * ===================================================================== */
+const SNOOPY_HOUSE_X = 289;           // left edge of the doghouse (it is 18 wide)
+const SNOOPY_ROOF = [298, 177];       // where he lies: the ridge of the roof
+const SNOOPY_DOOR = [298, 197];       // on the ground in front of the door
+
+function drawSnoopyHouse() {
+  const x = SNOOPY_HOUSE_X;
+  fillEllipse(x + 11, 195, 14, 3, 'rgba(0,20,0,.28)');
+  solid(x, 186, 18, 9, '#d9342b');                                              // walls
+  drawRect(x, 186, 18, 1, '#f26a5a'); drawRect(x, 194, 18, 1, '#a82420');
+  for (let i = 3; i < 18; i += 4) drawRect(x + i, 187, 1, 7, '#c22c24');         // boards
+  gable(x - 2, 177, 22, 10, '#a82420', '#c22c24');                                // roof
+  drawRect(x - 2, 186, 22, 1, '#fff');                                           // white trim
+  drawRect(x + 7, 188, 4, 1, INK); drawRect(x + 6, 189, 6, 6, '#120a1c');         // arched doorway
+  drawRect(x + 7, 188, 4, 1, '#120a1c');
+  drawRect(x + 5, 195, 8, 1, '#e8d8b8');                                         // doorstep
+  solid(x + 20, 192, 5, 3, '#e8e8f0'); drawRect(x + 21, 192, 3, 1, '#c9873a');    // food bowl
+  structureRects.push([286, 174, 28, 24]);
+}
+
+const snoopy = {
+  x: SNOOPY_ROOF[0], y: SNOOPY_ROOF[1], state: 'sleep', timer: 7, dir: 1, ph: 0,
+  em: null, emTimer: 2, item: null, plan: 0, target: null, lastTarget: null, path: null,
+  tx: 0, ty: 0, hop: 0, kind: '', repath: 0, retry: 0, then: ''
+};
+const snoopyOnRoof = () => snoopy.state === 'sleep' || snoopy.state === 'wake';
+const snoopyHopping = () => snoopy.state === 'hopDown' || snoopy.state === 'hopUp';
+
+function snoopyGoTo(x, y, state) {
+  snoopy.tx = x;
+  snoopy.ty = y;
+  snoopy.path = findPath(snoopy.x, snoopy.y, x, y);
+  snoopy.state = state;
+}
+// Walk one step along the route and turn to face the way he is going. Returns true on arrival.
+function snoopyWalk(dt, speed) {
+  const before = snoopy.x;
+  const arrived = stepToward(snoopy, dt, speed);
+  if (snoopy.x > before + .01) snoopy.dir = 1;
+  else if (snoopy.x < before - .01) snoopy.dir = -1;
+  return arrived;
+}
+// Jump between the roof and the ground in a short arc. Returns true when he has landed.
+function snoopyHop(dt, from, to) {
+  snoopy.hop = Math.min(1, snoopy.hop + dt / .8);
+  const p = snoopy.hop;
+  snoopy.x = from[0] + (to[0] - from[0]) * p;
+  snoopy.y = from[1] + (to[1] - from[1]) * p - Math.sin(Math.PI * p) * 9;
+  return p >= 1;
+}
+// Make someone stop what they are doing and watch for a few seconds
+function holdStill(c, seconds) {
+  releaseSpot(c);
+  c.item = null;
+  c.path = null;
+  c.s = 'watch';
+  c.w = seconds;
+}
+function snoopyApproach() {
+  const t = snoopy.target;
+  const x = Math.max(6, Math.min(WIDTH - 6, t.x + (snoopy.x > t.x ? 8 : -8)));
+  snoopyGoTo(x, Math.min(HEIGHT - 4, t.y + 1), 'go');
+}
+function snoopyNextTarget() {
+  const s = snoopy;
+  if (s.plan <= 0) { snoopyGoTo(SNOOPY_DOOR[0], SNOOPY_DOOR[1], 'return'); return; }
+  s.plan--;
+  const pool = people.filter(c => c.s !== 'away' && c.s !== 'flee' && c.s !== 'freeze' && !c.hid && c !== s.lastTarget);
+  pool.sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y));
+  const t = pickOne(pool.slice(0, 10));
+  if (!t) { s.plan = 0; snoopyGoTo(SNOOPY_DOOR[0], SNOOPY_DOOR[1], 'return'); return; }
+  s.target = t;
+  s.lastTarget = t;
+  s.retry = 0;
+  s.repath = 1.2;
+  snoopyApproach();
+}
+function snoopyStartInteraction() {
+  const s = snoopy, t = s.target;
+  s.dir = t.x >= s.x ? 1 : -1;
+  const kinds = ['pet', 'pet', 'dance', 'dance'];
+  if (t.item) kinds.push('steal', 'steal');
+  s.kind = pickOne(kinds);
+  s.state = 'act';
+  s.timer = s.kind === 'steal' ? 1.1 : 4.5;
+  if (s.kind === 'steal') {
+    s.item = t.item;
+    t.item = null;
+    showEmoji(t, 'excl', 2);
+    showEmoji(s, 'smile', 2);
+  }
+  else if (s.kind === 'pet') {
+    holdStill(t, s.timer + .3);
+    showEmoji(t, 'heart', 2.5);
+    showEmoji(s, 'heart', 2.5);
+  }
+  else {
+    holdStill(t, s.timer + .3);
+    showEmoji(s, 'note', 2.5);
+    people.forEach(p => {
+      if (p !== t && ['idle', 'act', 'go'].includes(p.s) && Math.hypot(p.x - s.x, p.y - s.y) < 32) {
+        holdStill(p, s.timer);
+        showEmoji(p, 'note', 2);
+      }
+    });
+  }
+}
+function snoopyGetScared() {
+  const s = snoopy;
+  if (s.item) { droppedItems.push({ x: s.x, y: s.y, it: s.item, t: 9 }); s.item = null; }
+  showEmoji(s, 'excl', 1.2);
+  if (snoopyOnRoof()) { s.state = 'hopDown'; s.hop = 0; s.then = 'hide'; }
+  else if (s.state === 'hopDown') s.then = 'hide';
+  else if (s.state === 'hopUp') { s.state = 'hide'; s.x = SNOOPY_DOOR[0]; s.y = SNOOPY_DOOR[1]; s.timer = randomBetween(3, 6); }
+  else snoopyGoTo(SNOOPY_DOOR[0], SNOOPY_DOOR[1], 'scared');
+}
+
+function snoopyUpdate(dt) {
+  const s = snoopy;
+  s.ph += dt * 10;
+  if (s.em) { s.em.t -= dt; if (s.em.t <= 0) s.em = null; }
+  if (noiseMode !== 'calm' && s.state !== 'hide' && s.state !== 'scared') snoopyGetScared();
+  switch (s.state) {
+    case 'sleep':
+      s.timer -= dt;
+      s.emTimer -= dt;
+      if (s.emTimer <= 0) { showEmoji(s, 'zzz', 2.2); s.emTimer = randomBetween(4, 7); }
+      if (s.timer <= 0) { s.state = 'wake'; s.timer = 1.4; showEmoji(s, 'star', 1.2); }
+      break;
+    case 'wake':
+      s.timer -= dt;
+      if (s.timer <= 0) { s.state = 'hopDown'; s.hop = 0; s.then = 'plan'; s.plan = 2 + Math.floor(Math.random() * 2); s.lastTarget = null; }
+      break;
+    case 'hopDown':
+      if (snoopyHop(dt, SNOOPY_ROOF, SNOOPY_DOOR)) {
+        s.x = SNOOPY_DOOR[0]; s.y = SNOOPY_DOOR[1];
+        if (s.then === 'hide') { s.state = 'hide'; s.timer = randomBetween(3, 6); }
+        else snoopyNextTarget();
+      }
+      break;
+    case 'go': {
+      const t = s.target;
+      if (!t || t.s === 'away' || t.s === 'flee' || t.hid) { snoopyNextTarget(); break; }
+      s.repath -= dt;
+      if (s.repath <= 0) { s.repath = 1.2; if (t.s === 'go') snoopyApproach(); }
+      if (snoopyWalk(dt, 26)) {
+        if (Math.hypot(s.x - t.x, s.y - t.y) < 16 || s.retry >= 3) snoopyStartInteraction();
+        else { s.retry++; snoopyApproach(); }
+      }
+      break;
+    }
+    case 'act':
+      s.timer -= dt;
+      if (s.kind === 'pet' && Math.random() < dt * 5) spawnParticle(s.x + s.dir * 4, s.y - 12, '#ff5a8a', -10, .9, 0, 2);
+      if (s.kind === 'dance' && Math.random() < dt * 8) spawnParticle(s.x + randomBetween(-6, 6), s.y - 14, pickOne(['#6ef', '#ffe066', '#f6a']), -12, .8, 0, 2);
+      if (s.timer <= 0) {
+        if (s.kind === 'steal') snoopyGoTo(SNOOPY_DOOR[0], SNOOPY_DOOR[1], 'run');
+        else snoopyNextTarget();
+      }
+      break;
+    case 'run':
+      if (snoopyWalk(dt, 38)) {
+        droppedItems.push({ x: s.x + randomBetween(-10, 10), y: s.y - 2, it: s.item, t: 9 });
+        s.item = null;
+        showEmoji(s, 'smile', 1.5);
+        snoopyNextTarget();
+      }
+      break;
+    case 'return':
+      if (snoopyWalk(dt, 24)) { s.state = 'hopUp'; s.hop = 0; s.x = SNOOPY_DOOR[0]; s.y = SNOOPY_DOOR[1]; }
+      break;
+    case 'hopUp':
+      if (snoopyHop(dt, SNOOPY_DOOR, SNOOPY_ROOF)) {
+        s.x = SNOOPY_ROOF[0]; s.y = SNOOPY_ROOF[1]; s.dir = 1;
+        s.state = 'sleep'; s.timer = randomBetween(25, 50); s.emTimer = 2;
+      }
+      break;
+    case 'scared':
+      if (snoopyWalk(dt, 55)) { s.state = 'hide'; s.timer = randomBetween(3, 6); }
+      break;
+    case 'hide':
+      s.x = SNOOPY_DOOR[0]; s.y = SNOOPY_DOOR[1];
+      if (noiseMode === 'calm') {
+        s.timer -= dt;
+        if (s.timer <= 0) { s.state = 'hopUp'; s.hop = 0; }
+      }
+      break;
+  }
+}
+
+/* ---------- Drawing ---------- */
+const snoopyDepth = () => (snoopyOnRoof() ? 195 : snoopyHopping() ? 196 : snoopy.y);
+
+// All poses use r(dx, dy, w, h, colour) where dx counts forward from Snoopy's middle in the direction he faces
+function snoopyLyingPose(x, y, d) {
+  const r = (dx, dy, w, h, c) => drawRect(d > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, c);
+  const breath = Math.sin(clock * 2) > .3 ? 1 : 0;
+  r(-6, -4 - breath, 11, 4 + breath, '#fff'); r(-3, -4 - breath, 3, 2, '#222');   // body and black spot
+  r(5, -6, 5, 5, '#fff'); r(4, -4, 2, 5, '#222'); r(9, -7, 2, 2, '#222');           // head, floppy ear, nose
+  r(7, -4, 2, 1, '#222'); r(4, -5, 1, 3, '#d22');                                  // closed eye, red collar
+  r(2, -6, 2, 2, '#fff'); r(-7, -7, 2, 3, '#fff');                                 // paws in the air
+}
+function snoopyWalkPose(x, y, d, step) {
+  const r = (dx, dy, w, h, c) => drawRect(d > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, c);
+  r(-5, -8, 1, 2, '#fff'); r(-4, -7, 9, 4, '#fff'); r(-3, -7, 3, 2, '#222');       // tail, body, spot
+  r(-3, -3, 2, 3 - step, '#fff'); r(2, -3, 2, 2 + step, '#fff');                    // legs
+  r(3, -10, 5, 5, '#fff'); r(2, -9, 2, 5, '#222'); r(8, -9, 2, 2, '#222');          // head, ear, nose
+  r(6, -8, 1, 1, '#222'); r(4, -5, 1, 2, '#d22');                                  // eye, collar
+}
+function snoopySitPose(x, y, d) {
+  const r = (dx, dy, w, h, c) => drawRect(d > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, c);
+  r(-4, -3, 2, 2, '#fff'); r(-3, -8, 5, 6, '#fff'); r(-2, -7, 2, 3, '#222'); r(-3, -2, 7, 2, '#fff');
+  r(0, -13, 5, 5, '#fff'); r(-1, -12, 2, 5, '#222'); r(5, -12, 2, 2, '#222'); r(3, -11, 1, 1, '#222'); r(1, -8, 1, 1, '#d22');
+}
+function snoopyDancePose(x, y, t) {
+  const hop = Math.abs(Math.sin(t * 6)) * 2 | 0, f = Math.sin(t * 12) > 0 ? 1 : 0;
+  y -= hop;
+  drawRect(x - 2, y - 9, 5, 6, '#fff'); drawRect(x - 2, y - 3, 2, 3, '#fff'); drawRect(x + 1, y - 3, 2, 3, '#fff');
+  drawRect(x - 3, y - 14, 7, 5, '#fff'); drawRect(x - 5, y - 13 + f, 2, 4, '#222'); drawRect(x + 4, y - 13 + 1 - f, 2, 4, '#222');
+  drawRect(x - 1, y - 11, 3, 2, '#222'); drawRect(x - 2, y - 13, 1, 1, '#222'); drawRect(x + 2, y - 13, 1, 1, '#222'); drawRect(x - 2, y - 9, 5, 1, '#d22');
+  drawRect(x - 5, y - 9 - f, 3, 1, '#fff'); drawRect(x + 3, y - 9 - (1 - f), 3, 1, '#fff');
+}
+function drawWoodstock(x, y, flying) {
+  const flap = flying && Math.sin(clock * 30) > 0 ? 1 : 0;
+  drawOutlined(() => {
+    drawRect(x, y, 3, 3, '#ffe14a'); drawRect(x, y - 1, 1, 1, '#ffe14a');
+    drawRect(x + 3, y + 1, 1, 1, '#f90'); drawRect(x + 1, y, 1, 1, '#222');
+    if (flying) drawRect(x - 1, y + 1 - flap * 2, 2, 1, '#ffd02a');
+  });
+}
+function drawSnoopy() {
+  const s = snoopy;
+  if (s.state === 'hide') {                                                       // two eyes in the dark doorway
+    if (Math.sin(clock * 1.7) > -.92) { drawRect(296, 191, 1, 2, '#fff'); drawRect(299, 191, 1, 2, '#fff'); }
+    return;
+  }
+  const x = Math.round(s.x), y = Math.round(s.y), d = s.dir;
+  if (!snoopyOnRoof()) {
+    const gy = snoopyHopping() ? (s.state === 'hopDown' ? SNOOPY_ROOF[1] + (SNOOPY_DOOR[1] - SNOOPY_ROOF[1]) * s.hop : SNOOPY_DOOR[1] + (SNOOPY_ROOF[1] - SNOOPY_DOOR[1]) * s.hop) : y;
+    fillEllipse(x + 1, gy, 5, 2, 'rgba(10,10,40,.3)');
+  }
+  const moving = ['go', 'run', 'return', 'scared'].includes(s.state);
+  const step = Math.sin(s.ph) > 0 ? 1 : 0;
+  if (s.state === 'sleep') drawOutlined(() => snoopyLyingPose(x, y, 1));
+  else if (s.state === 'wake') drawOutlined(() => snoopySitPose(x, y, 1));
+  else if (snoopyHopping() || (s.state === 'act' && s.kind === 'dance')) drawOutlined(() => snoopyDancePose(x, y, clock));
+  else if (s.state === 'act' && s.kind === 'pet') drawOutlined(() => snoopySitPose(x, y, d));
+  else drawOutlined(() => snoopyWalkPose(x, y, d, moving ? step : 0));
+  if (s.item) item(s.item, x - 1, y - 15);
+  // Woodstock rests on Snoopy's tummy while he sleeps and flutters around him otherwise
+  if (s.state === 'sleep') drawWoodstock(x - 3, y - 8 - (Math.sin(clock * 2.2) > .95 ? 2 : 0), false);
+  else drawWoodstock(Math.round(x + Math.cos(clock * 3) * 10), Math.round(y - 17 + Math.sin(clock * 4.2) * 3), true);
+}
+function drawSnoopyBubble() {
+  const s = snoopy;
+  if (!s.em || s.state === 'hide') return;
+  const rise = Math.min(3, (s.em.m - s.em.t) * 6) | 0;
+  ctx.globalAlpha = s.em.t < .3 ? s.em.t / .3 : 1;
+  bubble(Math.round(s.x) - 3, Math.round(s.y) - (snoopyOnRoof() ? 28 : 22) - rise, s.em.i);
+  ctx.globalAlpha = 1;
 }
 
 // ---- First-time setup: load saved settings, build the settings window, build the scenery ----
@@ -2484,6 +2954,7 @@ function gameLoop(now) {
     }
     people.forEach(c => updateCharacter(c, dt));
     prankTimer(dt);
+    snoopyUpdate(dt);
     updateVisitorsAndWeather(dt);
     if (currentEvent) {
         updateEvent(dt);
