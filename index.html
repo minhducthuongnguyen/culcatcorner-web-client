@@ -1816,6 +1816,10 @@ function drawNewEvents(e, t) {
 /* ---------- drawing characters ---------- */
 // Draw a character with an outline (dch0 draws the sprite itself)
 function drawCharacter(c) {
+    if (c.s === 'act' && c.act === 'broom') {
+        drawBroomRider(c);
+        return;
+    }
     drawOutlined(() => drawCharacterSprite(c));
 }
 function drawCharacterSprite(c) {
@@ -1826,7 +1830,9 @@ function drawCharacterSprite(c) {
     const fl = c.s === 'flee';
     const mvg = c.s === 'go' || fl;
     const sc = c.s === 'freeze' || fl;
-    fillEllipse(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
+    if (!c.air) {
+        fillEllipse(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
+    }
     let b = mvg ? (Math.abs(Math.sin(c.ph)) * (fl ? 2 : 1)) | 0 : (c.s === 'act' && !sit && Math.sin(clock * 4 + c.id) > .6 ? 1 : 0);
     if (c.an) {
         drawAnimal(c, x, y, b);
@@ -2189,7 +2195,7 @@ function drawFrame() {
     const L = [];
     people.forEach(c => {
         if (c.s !== 'away' && !c.hid) {
-            L.push([c.y, () => drawCharacter(c)]);
+            L.push([c.s === 'act' && c.act === 'broom' ? c.y + 40 : c.y, () => drawCharacter(c)]);
         }
     });
     TREES.forEach(t => L.push([t[1], () => drawTree(t[0], t[1])]));
@@ -2197,6 +2203,7 @@ function drawFrame() {
     L.push([90, drawClassroomFront]);
     L.sort((a, b) => a[0] - b[0]);
     L.forEach(o => o[1]());
+    drawMagicClassEffects();
     drawOverlay();
 }
 /* =====================================================================
@@ -2290,6 +2297,7 @@ function setupHolidayActivity() {
 function blockHolidayStructures() {
   const h = settings.holidays[0];
   blockRect(289, 182, 18, 13);                 // Snoopy's doghouse
+  blockMagicStations();
   blockMoreHolidayStructures(h);
   if (h === 'halloween') { blockRect(144, 18, 42, 15); [26, 38, 50, 62, 74, 86].forEach((x, i) => blockRect(x, 184 + (i % 2) * 2, 7, 5)); blockRect(89, 189, 7, 6); }
   if (h === 'thanks') { blockRect(144, 18, 44, 15); blockRect(56, 184, 4, 10); }
@@ -2301,6 +2309,7 @@ function drawHolidayStructures() {
   structureRects.length = 0;
   const h = settings.holidays[0];
   drawSnoopyHouse();
+  drawMagicStations();
   drawMoreHolidayStructures(h);
   if (h === 'halloween') { drawHauntedHouse(); drawGraveyard(); }
   if (h === 'thanks') { drawBarn(); drawCornfield(); }
@@ -2406,6 +2415,7 @@ function animateHolidayStructures() {
   if (h === 'xmas') { if (Math.random() < .08) spawnParticle(175, 0, '#e8e8f0', -8, 2.2, 0, 2); drawRect(57, 167, 3, 3, Math.sin(clock * 6) > 0 ? '#fff7a0' : '#ffe066'); drawRect(58, 166, 1, 5, '#ffe066'); }
   if (h === 'valentine' && Math.random() < .04) spawnParticle(166, 6, '#ff4a7a', -10, 2, 0, 2);
   animateMoreStructures(h);
+  animateMagicStations(.016);
 }
 
 /* ---------- More holiday structures ----------
@@ -2870,6 +2880,119 @@ function drawSnoopyBubble() {
   bubble(Math.round(s.x) - 3, Math.round(s.y) - (snoopyOnRoof() ? 28 : 22) - rise, s.em.i);
   ctx.globalAlpha = 1;
 }
+
+/* =====================================================================
+ * MAGIC CLASSES AND PRACTICE
+ * ---------------------------------------------------------------------
+ *   broom    a flock of students fly lazy figure-eights on brooms over launch rings
+ *            on the grass (spots on both sides of the school), leaving sparkle trails
+ *   potion   brewing class at three cauldron tables; now and then a brew pops
+ *   lesson   the mats become a levitation class: each student floats a book,
+ *            feather or glowing orb above their head
+ * plus two new events: Broom Race and Potion Boom.
+ * ===================================================================== */
+ACTIVITIES.broom = { w: 3, it: null, em: ['star', 'smile', 'excl'], d: [14, 26], s: [[124, 122], [124, 138], [124, 154], [208, 172], [222, 182], [208, 190]] };
+ACTIVITIES.potion = { w: 3, it: 'wand', em: ['sparkle', 'question', 'smile'], d: [14, 28], s: [[151, 172], [158, 172], [169, 172], [176, 172], [187, 172], [194, 172]] };
+ACTIVITIES.lesson.it = null;
+ACTIVITIES.lesson.em = ['sparkle', 'star', 'book'];
+['broom', 'potion'].forEach(k => { ACTIVITIES[k].o = ACTIVITIES[k].s.map(() => null); });
+
+const POTION_TABLES = [[147, 160, '#6fe05a'], [165, 160, '#c58cff'], [183, 160, '#ff7ab8']];   // x, y, colour of the brew
+
+function drawMagicStations() {
+  ACTIVITIES.broom.s.forEach(([x, y]) => {                                           // glowing launch rings on the grass
+    fillEllipse(x, y + 1, 9, 4, 'rgba(120,150,255,.28)'); fillEllipse(x, y + 1, 7, 3, 'rgba(190,210,255,.28)');
+    for (let a = 0; a < 6.28; a += 1.05) drawRect(x + Math.cos(a) * 8, y + 1 + Math.sin(a) * 3.3, 1, 1, '#cfe0ff');
+  });
+  POTION_TABLES.forEach(([x, y, color]) => {
+    fillEllipse(x + 8, y + 7, 9, 2, 'rgba(0,20,0,.25)');
+    solid(x, y + 2, 14, 5, '#8a5a3a'); drawRect(x, y + 2, 14, 1, '#a8703a'); drawRect(x + 1, y + 7, 2, 2, '#6b4423'); drawRect(x + 11, y + 7, 2, 2, '#6b4423');
+    solid(x + 4, y - 3, 7, 5, '#2a2a34'); drawRect(x + 3, y - 3, 9, 1, '#44444f'); drawRect(x + 5, y - 3, 5, 1, color);   // cauldron with brew
+    solid(x + 1, y - 2, 2, 4, '#9ad4ff'); drawRect(x + 1, y - 2, 2, 1, '#fff');                                       // bottles
+    solid(x + 12, y - 1, 2, 3, color); drawRect(x + 12, y - 1, 2, 1, '#fff');
+  });
+}
+function blockMagicStations() { POTION_TABLES.forEach(([x, y]) => blockRect(x, y + 2, 14, 6)); }
+
+// Where a broom rider is drawn this frame (lazy figure-eight around the launch ring) and which way they face
+function broomPose(c) {
+  const t = clock * 1.1 + c.sp * 1.05;
+  return { x: c.x + Math.cos(t) * 14, y: c.y + Math.sin(t * 2) * 4 - 12 + Math.sin(clock * 2.3 + c.sp) * 2, face: Math.sin(t) < 0 ? 1 : -1 };
+}
+function drawBroomRider(c) {
+  const p = broomPose(c), gx = c.x, gy = c.y;
+  fillEllipse(p.x + 1, gy + 2, 5, 2, 'rgba(10,10,40,.3)');                         // shadow stays on the ground
+  drawOutlined(() => {                                                              // the broom
+    drawRect(p.x - 8, p.y - 2, 17, 1, '#8b5a2b');
+    const tail = p.face > 0 ? p.x - 13 : p.x + 9;
+    drawRect(tail, p.y - 4, 5, 4, '#d9b45a'); drawRect(tail, p.y - 3, 5, 1, '#b8923a');
+  });
+  c.x = p.x; c.y = p.y; c.air = true;
+  drawOutlined(() => drawCharacterSprite(c));
+  c.x = gx; c.y = gy; c.air = false;
+}
+
+// Levitation class: a small object floats above each seated student
+function drawMagicClassEffects() {
+  people.forEach(c => {
+    if (c.s !== 'act' || c.act !== 'lesson') return;
+    const x = Math.round(c.x), y = Math.round(c.y - 22 + Math.sin(clock * 2.5 + c.id) * 2), kind = c.id % 3;
+    fillEllipse(x, y + 3, 4, 1, 'rgba(160,190,255,.35)');
+    drawOutlined(() => {
+      if (kind === 0) { drawRect(x - 2, y - 1, 5, 4, '#c33'); drawRect(x - 2, y - 1, 5, 1, '#fff'); }
+      else if (kind === 1) { drawRect(x - 3, y, 6, 1, '#fff'); drawRect(x + 2, y - 1, 2, 1, '#9ad4ff'); }
+      else { drawRect(x - 1, y - 1, 3, 3, '#6ef'); }
+    });
+    if (Math.sin(clock * 6 + c.id * 2) > .6) drawRect(x + 4, y - 3, 1, 1, '#fff');
+  });
+}
+
+// Animated: bubbling brews, the odd pop, sparkle trails behind broom riders
+function animateMagicStations(dt) {
+  POTION_TABLES.forEach(([x, y, color], i) => {
+    if (Math.random() < .08) spawnParticle(x + 7 + randomBetween(-2, 2), y - 4, color, -9, .8, 0, 2);
+    drawRect(x + 5 + ((clock * 3 + i) % 3 | 0), y - 3, 1, 1, '#fff');
+  });
+  people.forEach(c => {
+    if (c.s !== 'act') return;
+    if (c.act === 'broom' && Math.random() < dt * 14) { const p = broomPose(c); spawnParticle(p.x - p.face * 10, p.y, pickOne(['#ffe066', '#fff', '#b68cff', '#6ef']), 5, .6); }
+    if (c.act === 'potion' && Math.random() < dt * .1) {                                          // a brew pops
+      const t = POTION_TABLES[Math.floor(c.sp / 2)];
+      for (let i = 0; i < 14; i++) spawnParticle(t[0] + 7, t[1] - 3, t[2], randomBetween(-26, -8), .9, 30);
+      showEmoji(c, pickOne(['excl', 'sweat', 'sparkle']), 1.6);
+    }
+  });
+}
+
+// ---- Events ----
+addSpecialEvent('broomRace', { text: 'Broomstick race around the school!', dur: 15, emo: ['star', 'excl', 'smile'],
+  start(e) { e.r = [...Array(7)].map((_, i) => ({ lag: i * .045, robe: ['#c0392b', '#2e86de', '#27ae60', '#e1a400', '#8e44ad', '#e85d9f', '#1abc9c'][i], hat: pickOne(['#33264f', '#4a2c6e', '#1f3b66', '#7a2a3a']) })); },
+  draw(e, t, f) {
+    e.r.forEach((r, i) => {
+      const a = (t * .5 - r.lag * 6.28) + 0.4, x = 160 + Math.cos(a) * 140, y = 78 + Math.sin(a) * 52 + Math.sin(a * 3) * 5;
+      const face = -Math.sin(a) >= 0 ? 1 : -1;
+      if (t * .5 - r.lag * 6.28 < 0) return;
+      ctx.globalAlpha = f;
+      fillEllipse(x, y + 28, 5, 2, 'rgba(0,20,0,.2)');
+      if (Math.random() < .5) spawnParticle(x - face * 12, y, pickOne(['#ffe066', '#fff', '#ff9a3a']), 6, .6);
+      drawOutlined(() => {
+        drawRect(x - 8, y, 17, 1, '#8b5a2b'); drawRect(face > 0 ? x - 13 : x + 9, y - 2, 5, 4, '#d9b45a');
+        drawRect(x - 2, y - 5, 5, 5, r.robe); drawRect(x - 1, y - 9, 3, 3, '#f1c9a0');
+        drawRect(x - 3, y - 10, 7, 1, r.hat); drawRect(x - 1, y - 13, 3, 3, r.hat);
+      });
+      ctx.globalAlpha = 1;
+    });
+  } });
+addSpecialEvent('potionBoom', { text: 'Potion class: BOOM! Rainbow smoke!', dur: 12, emo: ['excl', 'sweat', 'sparkle'],
+  update(e, dt) {
+    if (e.t > 3 && !e.boomed) { e.boomed = true; POTION_TABLES.forEach(([x, y, color]) => { for (let i = 0; i < 34; i++) spawnParticle(x + 7, y - 3, pickOne([color, '#fff', '#ffe066']), randomBetween(-40, -10), 1.5, 15, randomBetween(-20, 20)); }); }
+    if (e.t > 3 && Math.random() < dt * 8) { const t = pickOne(POTION_TABLES); spawnParticle(t[0] + 7, t[1] - 4, t[2], -12, 2, 0, 3); }
+  },
+  draw(e, t, f) {
+    if (t < 3) return;
+    const a = Math.min(1, (t - 3) / 1.5) * Math.min(1, (e.d - t) / 3) * .45;
+    POTION_TABLES.forEach(([x, y, color], i) => { ctx.globalAlpha = a; fillEllipse(x + 7 + Math.sin(t + i) * 3, y - 6 - (t - 3) * 2, 12 + (t - 3), 7, color); ctx.globalAlpha = 1; });
+  } });
 
 // ---- First-time setup: load saved settings, build the settings window, build the scenery ----
 loadConfig();
