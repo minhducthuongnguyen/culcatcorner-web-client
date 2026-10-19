@@ -34,6 +34,7 @@ input{vertical-align:middle}
 #modal h2{font-size:13px;margin:0 0 4px}#modal h3{font-size:10px;margin:14px 0 6px}#modal p{font-size:8px;margin:0 0 6px;opacity:.8}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
 .opt{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;padding:6px 8px;border:2px solid rgba(0,0,0,.25);cursor:pointer;font-size:8px}
+.opt.rng{display:block;cursor:default}.opt.rng input{width:100%;margin-top:6px}
 .opt small{flex-basis:100%;padding-left:22px;font-size:7px;opacity:.75}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 button.alt{background:transparent;color:var(--fg);border:2px solid var(--fg)}
@@ -46,6 +47,8 @@ button.alt{background:transparent;color:var(--fg);border:2px solid var(--fg)}
 <div id="wrap"><div id="stage"><canvas id="c"></canvas><canvas id="nm"></canvas></div><div id="bn"></div></div>
 <div id="modal" hidden><div class="card" role="dialog" aria-label="Settings">
 <h2>Settings</h2><p>Choose which stories and holidays appear. Saved on this computer.</p>
+<h3>People at school</h3>
+<div class="grid"><label class="opt rng"><b>Students: <span id="stuVal">40</span></b><input type="range" id="cfgStudents" min="5" max="60" step="1" value="40"></label><label class="opt rng"><b>Teachers: <span id="teaVal">4</span></b><input type="range" id="cfgTeachers" min="1" max="4" step="1" value="4"></label></div>
 <h3>Book series (their characters visit and leave props around the school)</h3>
 <div class="row" style="margin:0 0 6px"><button id="cfgAll" class="alt">Select all</button><button id="cfgNone" class="alt">Clear</button></div>
 <div id="seriesList" class="grid"></div>
@@ -68,32 +71,39 @@ button.alt{background:transparent;color:var(--fg);border:2px solid var(--fg)}
 // ---- Canvas setup: the game is drawn at 320x200 and scaled up by CSS for the pixel look ----
 const WIDTH = 320;
 const HEIGHT = 200;
+const SCALE = 2;                     // render resolution: 2x the logic pixels, so sprites can use half-pixel detail
+const STUDENTS_MAX = 60;             // students that exist (the Settings slider picks how many are at school)
+const VISITOR_START = STUDENTS_MAX + 4;   // people[] index where book-character visitors begin
 const byId = i => document.getElementById(i);
 const canvas = byId('c');
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
+canvas.width = WIDTH * SCALE;
+canvas.height = HEIGHT * SCALE;
 let ctx = canvas.getContext('2d');
+ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+ctx.imageSmoothingEnabled = false;
 const backgroundCanvas = document.createElement('canvas');
-backgroundCanvas.width = WIDTH;
-backgroundCanvas.height = HEIGHT;
+backgroundCanvas.width = WIDTH * SCALE;
+backgroundCanvas.height = HEIGHT * SCALE;
 let ol = 0;
 // R = draw a filled rectangle. While 'ol' is on it draws a dark 1px-bigger rectangle instead,
 // which is how outlines work (see OL below).
+const HALF = 1 / SCALE;
+const snapToGrid = v => Math.round(v * SCALE) / SCALE;
 const drawRect = (x, y, w, h, c) => {
     if (ol) {
         ctx.fillStyle = '#1b1228';
-        ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, w + 2, h + 2);
+        ctx.fillRect(snapToGrid(x) - HALF, snapToGrid(y) - HALF, w + 2 * HALF, h + 2 * HALF);
         return;
     }
     ctx.fillStyle = c;
-    ctx.fillRect(Math.round(x), Math.round(y), w, h);
+    ctx.fillRect(snapToGrid(x), snapToGrid(y), w, h);
 };
-// ob = draw a 1px outline around a rectangle
+// ob = draw a fine outline (half a logic pixel) around a rectangle
 const drawRectOutline = (x, y, w, h, c = '#2a1a14') => {
-    drawRect(x - 1, y - 1, w + 2, 1, c);
-    drawRect(x - 1, y + h, w + 2, 1, c);
-    drawRect(x - 1, y, 1, h, c);
-    drawRect(x + w, y, 1, h, c);
+    drawRect(x - HALF, y - HALF, w + 2 * HALF, HALF, c);
+    drawRect(x - HALF, y + h, w + 2 * HALF, HALF, c);
+    drawRect(x - HALF, y, HALF, h, c);
+    drawRect(x + w, y, HALF, h, c);
 };
 // OL(fn) = run a drawing function twice: first as a dark silhouette, then in colour => outlined sprite
 const drawOutlined = f => {
@@ -110,9 +120,9 @@ function fillEllipse(cx, cy, rx, ry, c) {
         return;
     }
     ctx.fillStyle = c;
-    for (let y = -ry; y <= ry; y++) {
-        const w = Math.sqrt(1 - y * y / (ry * ry)) * rx;
-        ctx.fillRect(Math.round(cx - w), Math.round(cy + y), Math.round(w * 2), 1);
+    for (let y = -ry; y <= ry; y += HALF) {
+        const w = Math.sqrt(Math.max(0, 1 - y * y / (ry * ry))) * rx;
+        ctx.fillRect(snapToGrid(cx - w), snapToGrid(cy + y), snapToGrid(w * 2), HALF);
     }
 }
 // ---- Tiny pixel emoji: each icon is 7x7 characters, letters map to the colours in PAL ----
@@ -184,16 +194,16 @@ const ROBE_COLORS = ['#c0392b', '#2e86de', '#27ae60', '#e1a400'];
 const HAT_COLORS = ['#33264f', '#4a2c6e', '#1f3b66', '#7a2a3a'];
 // ---- CHARACTERS: 40 students (cs[0..39]) followed by 4 teachers (cs[40..43]) ----
 const people = [];
-for (let i = 0; i < 44; i++) {
-    const tc = i >= 40;
-    const hm = tc ? TEACHER_POSTS[i - 40] : null;
-    people.push({ id: i, tc, tn: i - 40, hm, x: hm ? hm[0] : randomBetween(20, 300), y: hm ? hm[1] : randomBetween(93, 99), tx: 0, ty: 0, s: tc ? 'act' : 'idle', w: randomBetween(0, 3), ph: randomBetween(0, 6), sk: pickOne(SKIN_TONES), hr: pickOne(HAIR_COLORS), hc: pickOne(HAT_COLORS), rb: tc ? ['#6a3fb5', '#1f7a8c', '#8c2f5e', '#a35a1f'][i - 40] : pickOne(ROBE_COLORS), ht: Math.random() < .5, em: null, item: null, act: null, sp: 0, last: null, then: 'idle', ex: 0, ey: 0, ret: 0, frz: 0, ec: randomBetween(1, 3), jx: 0 });
+for (let i = 0; i < VISITOR_START; i++) {
+    const tc = i >= STUDENTS_MAX;
+    const hm = tc ? TEACHER_POSTS[i - STUDENTS_MAX] : null;
+    people.push({ id: i, tc, tn: i - STUDENTS_MAX, hm, x: hm ? hm[0] : randomBetween(20, 300), y: hm ? hm[1] : randomBetween(93, 99), tx: 0, ty: 0, s: tc ? 'act' : 'idle', w: randomBetween(0, 3), ph: randomBetween(0, 6), sk: pickOne(SKIN_TONES), hr: pickOne(HAIR_COLORS), hc: pickOne(HAT_COLORS), rb: tc ? ['#6a3fb5', '#1f7a8c', '#8c2f5e', '#a35a1f'][i - STUDENTS_MAX] : pickOne(ROBE_COLORS), ht: Math.random() < .5, em: null, item: null, act: null, sp: 0, last: null, then: 'idle', ex: 0, ey: 0, ret: 0, frz: 0, ec: randomBetween(1, 3), jx: 0 });
 }
 /* Special characters from the Horrible Harry books (names are drawn under their feet) */
 Object.assign(people[0], { name: 'Harry', hr: '#111', ht: false, rb: '#1a1a24' });
 Object.assign(people[1], { name: 'Doug', hr: '#6b3f1d', ht: false, rb: '#2e86de', gl: true });
 Object.assign(people[2], { name: 'Song Lee', hr: '#111', ht: false, rb: '#ff7ab8' });
-people[40].name = 'Miss Mackle';
+people[STUDENTS_MAX].name = 'Miss Mackle';
 // Show an emoji bubble above a character for t seconds
 const showEmoji = (c, i, t = 1.8) => {
     c.em = { i, t, m: t };
@@ -599,7 +609,7 @@ function onFlee() {
 }
 // After the noise stops: give each absent character a return time within ~1 minute, arriving alone or in groups of up to 4
 function scheduleReturns() {
-    const a = people.filter(c => c.s === 'away' || c.s === 'flee').sort(() => Math.random() - .5);
+    const a = people.filter(c => !c.gone && (c.s === 'away' || c.s === 'flee')).sort(() => Math.random() - .5);
     let i = 0;
     while (i < a.length) {
         const gr = a.slice(i, i + pickOne([1, 1, 2, 3, 4]));
@@ -686,7 +696,7 @@ const TREES = [[10, 102], [134, 170], [212, 108], [306, 94], [312, 180], [8, 190
  * ===================================================================== */
 
 // ---- What is switched on (saved in the browser so it survives a reload) ----
-const settings = { series: ['mth', 'hh', 'pete', 'arthur', 'junie', 'frog', 'eleph', 'dogman'], holidays: [] };
+const settings = { series: ['mth', 'hh', 'pete', 'arthur', 'junie', 'frog', 'eleph', 'dogman'], holidays: [], students: 40, teachers: 4 };
 const SETTINGS_KEY = 'wizardSchoolSettings';
 
 // ---- Book series. 'place' = [x, y, action] where visitors of that series like to hang out.
@@ -741,6 +751,8 @@ function loadConfig() {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
     if (saved) {
       settings.series = saved.series.filter(id => BOOK_SERIES.some(s => s.id === id));
+      settings.students = clampNumber(+saved.students || 40, 5, STUDENTS_MAX);
+      settings.teachers = clampNumber(+saved.teachers || 4, 1, 4);
       settings.holidays = saved.holidays.filter(id => HOLIDAYS.some(h => h.id === id)).slice(0, 1);   // only one holiday at a time
     }
   } catch (e) { /* storage unavailable: keep defaults */ }
@@ -755,13 +767,15 @@ function buildSettingsUI() {
   byId('seriesList').innerHTML = BOOK_SERIES.map(s => option('series', s.id, s.name, BOOK_SERIES_NOTES[s.id])).join('');
   byId('holList').innerHTML = option('holidays', '', 'No holiday', 'Normal school', 'radio')
     + HOLIDAYS.map(h => option('holidays', h.id, h.name, h.note, 'radio')).join('');
-  byId('cfgBtn').onclick = () => { syncChecks(); byId('modal').hidden = false; };
+  byId('cfgBtn').onclick = () => { syncChecks(); syncCrowdControls(); byId('modal').hidden = false; };
   byId('cfgCancel').onclick = () => { byId('modal').hidden = true; };
-  byId('cfgSave').onclick = () => { readChecks(); byId('modal').hidden = true; applyConfig(); };
+  byId('cfgStudents').oninput = () => byId('stuVal').textContent = byId('cfgStudents').value;
+  byId('cfgTeachers').oninput = () => byId('teaVal').textContent = byId('cfgTeachers').value;
+  byId('cfgSave').onclick = () => { readChecks(); readCrowdControls(); byId('modal').hidden = true; applyConfig(); };
   byId('cfgAll').onclick = () => setAllChecked('series', true);
   byId('cfgNone').onclick = () => setAllChecked('series', false);
 }
-const allCheckboxes = () => Array.from(document.querySelectorAll('#modal input'));
+const allCheckboxes = () => Array.from(document.querySelectorAll('#modal input[data-group]'));
 const syncChecks = () => allCheckboxes().forEach(i => { i.checked = (i.dataset.group === 'holidays' && i.value === '') ? settings.holidays.length === 0 : settings[i.dataset.group].includes(i.value); });
 const setAllChecked = (group, on) => allCheckboxes().forEach(i => { if (i.dataset.group === group) i.checked = on; });
 function readChecks() {
@@ -793,15 +807,16 @@ function applyConfig() {
     : h.includes('thanks') ? ['#6a2f0d', '#d2691e', '#f0a030', '#a8501a']
     : h.includes('halloween') ? ['#2a1a30', '#5a3a6a', '#7a5a8a', '#3a2a4a'] : TREE_DEFAULT;
   const hh = settings.series.includes('hh');
-  const cast = [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [40, 'Miss Mackle']];
+  const cast = [[0, 'Harry'], [1, 'Doug'], [2, 'Song Lee'], [STUDENTS_MAX, 'Miss Mackle']];
   cast.forEach(([i, n]) => { people[i].name = hh ? n : null; });
   if (hh && !hhWasOn) arriveGradually(cast.map(c => c[0]));            // just switched on: they walk in one by one
   else if (!hh && hhWasOn) cast.forEach(([i]) => { if (people[i].s === 'away') people[i].ret = clock; });
   hhWasOn = hh;
   if (!h.includes('xmas')) snowCover = 0;                               // snow melts when Christmas is switched off
   setupHolidayActivity();
-  people.splice(44);            // remove any visitors currently on screen
+  people.splice(VISITOR_START);            // remove any visitors currently on screen
   people.forEach(giveCostume);
+  applyCrowd();
   rebuildWorld();
   saveConfig();
 }
@@ -941,7 +956,7 @@ function visitorAction(c) {
   if (st.act === 'stage') showEmoji(c, 'note', 1.4);
 }
 function removeFinishedVisitors() {
-  for (let i = people.length - 1; i >= 44; i--) if (people[i].guest && people[i].s === 'away') people.splice(i, 1);
+  for (let i = people.length - 1; i >= VISITOR_START; i--) if (people[i].guest && people[i].s === 'away') people.splice(i, 1);
 }
 
 /* ---------- Props: little scenery pieces that refer to the chosen books ---------- */
@@ -1019,8 +1034,8 @@ let snowCover = 0;                                   // 0 = bare ground ... 1 = 
 let snowThreshold = null;                            // per block: the coverage at which it turns white (2 = never, not ground)
 let snowDrawnStep = -1;                              // last coverage step we painted (so we only repaint when it changes)
 const snowCanvas = document.createElement('canvas');
-snowCanvas.width = WIDTH;
-snowCanvas.height = HEIGHT;
+snowCanvas.width = WIDTH * SCALE;
+snowCanvas.height = HEIGHT * SCALE;
 
 // Is this background pixel grass or path (snow can settle) rather than a building, water, etc.?
 function isGroundPixel(r, g, b, x, y) {
@@ -1032,7 +1047,7 @@ function isGroundPixel(r, g, b, x, y) {
   return grass || path;
 }
 function buildSnowMask() {
-  const pixels = backgroundCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT).data;
+  const pixels = backgroundCanvas.getContext('2d').getImageData(0, 0, WIDTH * SCALE, HEIGHT * SCALE).data;
   snowThreshold = new Float32Array(SNOW_COLS * SNOW_ROWS).fill(2);
   // Coarse random grid, smoothly interpolated: neighbouring blocks get similar thresholds, so snow settles in blobby patches
   const CC = 41, CR = 26, coarse = Array.from({ length: CC * CR }, () => Math.random());
@@ -1043,7 +1058,7 @@ function buildSnowMask() {
   };
   for (let by = 0; by < SNOW_ROWS; by++) {
     for (let bx = 0; bx < SNOW_COLS; bx++) {
-      const x = bx * SNOW_BLOCK, y = by * SNOW_BLOCK, i = (y * WIDTH + x) * 4;
+      const x = bx * SNOW_BLOCK, y = by * SNOW_BLOCK, i = ((y * SCALE) * WIDTH * SCALE + x * SCALE) * 4;
       if (isGroundPixel(pixels[i], pixels[i + 1], pixels[i + 2], x, y)) snowThreshold[by * SNOW_COLS + bx] = Math.min(.999, Math.max(0, (smoothNoise(bx, by) - .5) * 1.9 + .5 + (Math.random() - .5) * .2));
     }
   }
@@ -1055,14 +1070,15 @@ function drawSnowCover() {
   if (step !== snowDrawnStep) {                       // repaint the snow layer only when the coverage grew a little
     snowDrawnStep = step;
     const sc = snowCanvas.getContext('2d');
-    sc.clearRect(0, 0, WIDTH, HEIGHT);
+    sc.clearRect(0, 0, WIDTH * SCALE, HEIGHT * SCALE);
+    sc.setTransform(SCALE, 0, 0, SCALE, 0, 0);
     for (let i = 0; i < snowThreshold.length; i++) {
       if (snowThreshold[i] >= snowCover) continue;
       sc.fillStyle = i % 5 === 0 ? '#dfe9f6' : '#f6f9ff';
       sc.fillRect((i % SNOW_COLS) * SNOW_BLOCK, Math.floor(i / SNOW_COLS) * SNOW_BLOCK, SNOW_BLOCK, SNOW_BLOCK);
     }
   }
-  ctx.drawImage(snowCanvas, 0, 0);
+  ctx.drawImage(snowCanvas, 0, 0, WIDTH, HEIGHT);
 }
 
 /* ---------- Things that move in the scene (drawn before characters) ---------- */
@@ -1465,21 +1481,146 @@ function routeToNearestEdge(x, y) {
     }
     return smoothPath(x, y, pts);
 }
-// Draw a tree (sorted by its base so characters can walk behind it)
-function drawTreeBase(x, y) {
-    fillEllipse(x + 8, y + 1, 12, 3, 'rgba(0,20,0,.28)');                    // cast shadow (light comes from the top-left)
-    drawRectOutline(x - 2, y - 7, 4, 7);                                     // trunk with bark shading and roots
-    drawRect(x - 2, y - 7, 4, 7, '#6b4423'); drawRect(x - 2, y - 7, 1, 7, '#8a5a30'); drawRect(x + 1, y - 7, 1, 7, '#4a2e16');
-    drawRect(x - 3, y - 1, 1, 1, '#6b4423'); drawRect(x + 2, y - 1, 1, 1, '#4a2e16');
-    const blobs = [[0, -15, 9, 8], [-6, -12, 6, 5], [6, -12, 6, 5], [0, -21, 6, 5]];   // canopy = four overlapping leaf clusters
-    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx + 1, ry + 1, treeColors[0]));
-    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx, ry, treeColors[1]));
-    fillEllipse(x - 2, y - 18, 5, 3, treeColors[2]); fillEllipse(x - 6, y - 13, 3, 2, treeColors[2]);   // sunny side
-    for (let i = 0; i < 12; i++) {                                           // shaded underside + leaf specks
-        drawRect(x + ((i * 7) % 15) - 6, y - 8 - ((i * 5) % 7), 2, 1, treeColors[3]);
-        if (i % 3 === 0) drawRect(x + ((i * 5) % 13) - 8, y - 22 + ((i * 3) % 8), 1, 1, treeColors[2]);
-    }
+
+/* =====================================================================
+ * HD SCENERY: fine ground grain, textures, shading, lighting and ripples
+ * ===================================================================== */
+// A 1px line drawn from half-pixel to half-pixel
+function hdLine(x1, y1, x2, y2, color) {
+  const steps = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) * 2);
+  for (let i = 0; i <= steps; i++) drawRect(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, .5, .5, color);
 }
+// Painted first: speckled grass in five greens, mowing stripes and tiny blades
+function drawGroundGrain() {
+  const rnd = seededRandom(77), tones = ['#4f9242', '#5eab4c', '#559a46', '#6bb858', '#4a8a3d'];
+  for (let i = 0; i < 2800; i++) drawRect(rnd() * WIDTH, rnd() * HEIGHT, rnd() < .3 ? 1 : .5, .5, tones[i % 5]);
+  for (let x = 0; x < WIDTH; x += 16) drawRect(x, 0, 8, HEIGHT, 'rgba(255,255,255,.025)');
+  for (let i = 0; i < 300; i++) { const x = rnd() * WIDTH, y = rnd() * HEIGHT; drawRect(x, y, .5, 1.5, '#3f8236'); drawRect(x + .5, y + .5, .5, 1, '#78c267'); }
+}
+// Painted after the main scenery: texture and shading on the buildings, pond, path and magic circle
+function drawHDDetail() {
+  const rnd = seededRandom(913);
+  // --- classroom: floor grain, rug pattern, soft shadows along the walls, ink pots on the desks
+  for (let i = 0; i < 300; i++) drawRect(24 + rnd() * 100, 34 + rnd() * 46, 1 + rnd() * 2.5, .5, 'rgba(120,80,40,.2)');
+  [[48, 36, 64, 40], [50, 38, 60, 36]].forEach(([x, y, w, h], i) => {
+    drawRect(x, y, w, .5, `rgba(170,50,50,${.4 - i * .1})`); drawRect(x, y + h - .5, w, .5, `rgba(170,50,50,${.4 - i * .1})`);
+    drawRect(x, y, .5, h, `rgba(170,50,50,${.4 - i * .1})`); drawRect(x + w - .5, y, .5, h, `rgba(170,50,50,${.4 - i * .1})`);
+  });
+  for (let k = 0; k < 5; k++) { const w = 10 - k * 2; drawRect(80 - w / 2, 56 - k * 1.5, w, .5, 'rgba(230,190,90,.35)'); drawRect(80 - w / 2, 56 + k * 1.5, w, .5, 'rgba(230,190,90,.35)'); }
+  for (let i = 0; i < 5; i++) {
+    drawRect(22 + i, 34, 1, 48, `rgba(40,20,0,${.16 - i * .03})`); drawRect(127 - i, 34, 1, 48, `rgba(40,20,0,${.16 - i * .03})`);
+    drawRect(22, 34 + i, 106, 1, `rgba(40,20,0,${.14 - i * .03})`);
+  }
+  [34, 58, 82, 106].forEach(x => [44, 62].forEach(y => { drawRect(x + 10, y + 2, 1.5, 1.5, '#222'); hdLine(x + 11.5, y + 2, x + 12.5, y - .5, '#fff'); drawRect(x + 2, y + 1, 4, .5, 'rgba(0,0,0,.2)'); }));
+  // --- classroom roof: shingle texture and moss
+  for (let x = 16; x < 134; x += 2) drawRect(x, 14 + (x % 4 ? 0 : .5), 1, .5, 'rgba(255,200,170,.35)');
+  // --- stage: board highlights, knots, warm spot-light pools, curtain folds
+  for (let x = 198; x < 302; x += 8) drawRect(x + 1, 30, .5, 32, 'rgba(255,230,180,.16)');
+  for (let i = 0; i < 40; i++) drawRect(200 + rnd() * 100, 31 + rnd() * 30, 2 + rnd() * 3, .5, 'rgba(90,50,20,.22)');
+  [[222, 46], [250, 46], [278, 46]].forEach(([x, y]) => { fillEllipse(x, y, 14, 5, 'rgba(255,240,180,.07)'); fillEllipse(x, y, 8, 3, 'rgba(255,240,180,.07)'); });
+  [198, 294].forEach(x => { for (let y = 14; y < 62; y += 4) { drawRect(x + 1, y, .5, 3, 'rgba(255,120,120,.35)'); drawRect(x + 6, y, .5, 3, 'rgba(60,0,10,.4)'); } });
+  // --- path: grass fringe along both edges and loose pebbles
+  for (let x = 12; x < 308; x += 1.5) { if (rnd() < .6) drawRect(x, 89 + rnd() * .5, .5, 1, rnd() < .5 ? '#4a8a3d' : '#78c267'); if (rnd() < .6) drawRect(x, 103.5, .5, 1, rnd() < .5 ? '#4a8a3d' : '#78c267'); }
+  for (let i = 0; i < 70; i++) { const x = 14 + rnd() * 290, y = 92 + rnd() * 10; if (Math.hypot((x - 160) / 28, (y - 97) / 12) > 1) fillEllipse(x, y, 1 + rnd(), .6, rnd() < .5 ? '#a8946a' : '#e6d8ae'); }
+  // --- pond: depth bands, sky reflection and brighter lily pads
+  fillEllipse(265, 142, 24, 11, 'rgba(15,60,130,.22)'); fillEllipse(263, 141, 16, 7, 'rgba(15,50,120,.22)');
+  [[248, 132, 12], [268, 134, 9], [281, 144, 8], [254, 146, 7]].forEach(([x, y, w]) => { drawRect(x, y, w, .5, 'rgba(255,255,255,.4)'); drawRect(x + 2, y + 1.5, w - 4, .5, 'rgba(255,255,255,.25)'); });
+  [[255, 135], [280, 148], [250, 148]].forEach(([x, y]) => { drawRect(x - 1, y - 2, 2, .5, '#1f6a2c'); hdLine(x, y, x + 3, y - 1, '#4ab85a'); });
+  // --- magic circle: two glowing rune rings, eight rune stones and a five-pointed star
+  const cx = 165, cy = 56;
+  [[22, 9.5], [15, 6.5]].forEach(([rx, ry]) => { for (let a = 0; a < 6.283; a += .05) drawRect(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, .5, .5, '#c9bcff'); });
+  for (let k = 0; k < 8; k++) { const a = k * .785 + .39; drawRect(cx + Math.cos(a) * 18.5 - .75, cy + Math.sin(a) * 8 - .75, 1.5, 1.5, k % 2 ? '#8fe0ff' : '#ffd84a'); }
+  const pts = [0, 1, 2, 3, 4].map(k => [cx + Math.cos(k * 1.2566 - 1.5708) * 12, cy + Math.sin(k * 1.2566 - 1.5708) * 5]);
+  [0, 2, 4, 1, 3, 0].forEach((k, i, arr) => { if (i) hdLine(pts[arr[i - 1]][0], pts[arr[i - 1]][1], pts[k][0], pts[k][1], 'rgba(220,210,255,.7)'); });
+  // --- garden planters and lesson mats: lighter rims, soil, stitched borders
+  [25, 52, 79].forEach(x => [116, 140].forEach(y => { drawRect(x, y, 22, .5, 'rgba(255,230,190,.35)'); for (let i = 0; i < 14; i++) drawRect(x + 1 + rnd() * 20, y + 2 + rnd() * 10, .5, .5, rnd() < .5 ? '#2a1608' : '#6a4a2a'); }));
+  ACTIVITIES.lesson.s.forEach(s => { for (let k = 0; k < 9; k += 2) { drawRect(s[0] - 5.5 + k, s[1] - 3.5, 1, .5, 'rgba(255,255,255,.45)'); drawRect(s[0] - 5.5 + k, s[1] + 1, 1, .5, 'rgba(255,255,255,.45)'); } });
+}
+
+// Soft light from the top left and a gentle vignette, drawn over the finished frame
+let lightCanvas = null;
+function buildLightOverlay() {
+  lightCanvas = document.createElement('canvas');
+  lightCanvas.width = WIDTH * SCALE;
+  lightCanvas.height = HEIGHT * SCALE;
+  const g = lightCanvas.getContext('2d');
+  const vignette = g.createRadialGradient(lightCanvas.width / 2, lightCanvas.height / 2, lightCanvas.height * .38, lightCanvas.width / 2, lightCanvas.height / 2, lightCanvas.width * .62);
+  vignette.addColorStop(0, 'rgba(10,20,50,0)'); vignette.addColorStop(1, 'rgba(10,20,50,.34)');
+  g.fillStyle = vignette; g.fillRect(0, 0, lightCanvas.width, lightCanvas.height);
+  const sun = g.createLinearGradient(0, 0, lightCanvas.width * .7, lightCanvas.height * .8);
+  sun.addColorStop(0, 'rgba(255,238,190,.16)'); sun.addColorStop(.55, 'rgba(255,238,190,0)');
+  g.fillStyle = sun; g.fillRect(0, 0, lightCanvas.width, lightCanvas.height);
+}
+function drawLightOverlay() {
+  if (!lightCanvas) buildLightOverlay();
+  ctx.drawImage(lightCanvas, 0, 0, WIDTH, HEIGHT);
+}
+// Animated: expanding ripples on the pond
+function animatePondRipples() {
+  for (let k = 0; k < 3; k++) {
+    const p = (clock * .3 + k / 3) % 1, cx = 256 + k * 11, cy = 136 + (k % 2) * 7, rx = 1.5 + p * 8, ry = rx * .45;
+    ctx.globalAlpha = (1 - p) * .65;
+    for (let a = 0; a < 6.283; a += .3) drawRect(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, .5, .5, '#e8f6ff');
+    ctx.globalAlpha = 1;
+  }
+}
+
+
+/* =====================================================================
+ * CROWD SIZE: how many students and teachers are at school (set in Settings)
+ * ---------------------------------------------------------------------
+ * All characters exist all the time, but the ones beyond the chosen number are
+ * "off": they wait off screen and never come back until the number goes up.
+ * Raising the number makes the new ones walk in from the screen edges one by one;
+ * lowering it sends the extra ones walking off the nearest edge.
+ * ===================================================================== */
+let crowdReady = false;                          // false until the first applyCrowd (start-up is silent)
+const crowdTotal = () => settings.students + settings.teachers;
+const clampNumber = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function applyCrowd() {
+  people.forEach(c => {
+    if (c.guest) return;
+    const shouldBeOn = c.tc ? c.tn < settings.teachers : c.id < settings.students;
+    if (shouldBeOn && c.gone) {                    // joins the school: walks in from a screen edge
+      c.gone = false;
+      releaseSpot(c); dropHeldItem(c);
+      const left = Math.random() < .5;
+      c.s = 'away'; c.late = true; c.path = null; c.em = null; c.jx = 0; c.frz = 0;
+      c.ex = left ? -14 : WIDTH + 14; c.ey = randomBetween(93, 99);
+      c.ret = crowdReady ? clock + randomBetween(.5, 9) : clock;
+      c.x = c.ex; c.y = c.ey;
+    }
+    else if (!shouldBeOn && !c.gone) {             // leaves the school
+      c.gone = true;
+      releaseSpot(c); dropHeldItem(c);
+      if (!crowdReady || c.s === 'away' || c.s === 'flee') {
+        if (c.s !== 'flee') c.s = 'away';
+        c.late = false; c.ret = 1e9; c.em = null;
+        if (!crowdReady) { c.x = -40; c.y = -40; }
+      }
+      else {
+        c.jx = 0; c.hid = false; c.s = 'flee';
+        const route = routeToNearestEdge(c.x, c.y), end = route.length ? route[route.length - 1] : [c.x, c.y];
+        c.path = route;
+        c.tx = end[0] < 4 ? -14 : end[0] > WIDTH - 4 ? WIDTH + 14 : end[0];
+        c.ty = end[1] < 4 ? -16 : end[1] > HEIGHT - 4 ? HEIGHT + 16 : end[1];
+        c.then = 'away';
+      }
+    }
+  });
+  crowdReady = true;
+}
+// Settings window: the two sliders
+function syncCrowdControls() {
+  byId('cfgStudents').value = settings.students; byId('stuVal').textContent = settings.students;
+  byId('cfgTeachers').value = settings.teachers; byId('teaVal').textContent = settings.teachers;
+}
+function readCrowdControls() {
+  settings.students = clampNumber(+byId('cfgStudents').value || 40, 5, STUDENTS_MAX);
+  settings.teachers = clampNumber(+byId('cfgTeachers').value || 4, 1, 4);
+}
+
 function drawTree(x, y) {
     drawTreeBase(x, y);
     decorateTree(x, y);
@@ -1517,10 +1658,13 @@ function drawClassroomFront() {
 // Draws everything that never moves (grass, paths, buildings, pond...) once, into an off-screen image
 function drawStaticScene() {
     ctx = backgroundCanvas.getContext('2d');
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    ctx.imageSmoothingEnabled = false;
     drawRect(0, 0, WIDTH, HEIGHT, '#5aa14a');
     for (let i = 0; i < 900; i++) {
         drawRect(randomBetween(0, WIDTH), randomBetween(0, HEIGHT), 1, 1, pickOne(['#67b155', '#4e9040', '#6cba5a']));
     }
+    drawGroundGrain();
     drawRect(12, 90, 296, 14, '#cdb98a');
     drawRect(12, 90, 296, 1, '#b8a375');
     drawRect(12, 103, 296, 1, '#b8a375');
@@ -1640,6 +1784,7 @@ function drawStaticScene() {
     drawRectOutline(159, 104, 26, 13, K);
     ACTIVITIES.lesson.s.forEach(s => drawRectOutline(s[0] - 6, s[1] - 4, 10, 6, K));
     drawSceneDetail();
+    drawHDDetail();
     drawExtraScenery();
     ctx = canvas.getContext('2d');
 }
@@ -1822,114 +1967,191 @@ function drawCharacter(c) {
     }
     drawOutlined(() => drawCharacterSprite(c));
 }
+// ---- Characters are drawn at half-pixel detail: every coordinate below may end in .5 ----
+// (x, y) is the middle of the feet. 'b' is the walking bob (0 or 1).
 function drawCharacterSprite(c) {
-    const x = Math.round(c.x + c.jx);
-    const y = Math.round(c.y);
+    const x = Math.round((c.x + c.jx) * 2) / 2;
+    const y = Math.round(c.y * 2) / 2;
     const a = ACTIVITIES[c.act];
     const sit = c.s === 'act' && a && a.sit && !c.tc;
     const fl = c.s === 'flee';
     const mvg = c.s === 'go' || fl;
-    const sc = c.s === 'freeze' || fl;
+    const scared = c.s === 'freeze' || fl;
     if (!c.air) {
         fillEllipse(x + 1, y, 5, 2, 'rgba(10,10,40,.3)');
     }
-    let b = mvg ? (Math.abs(Math.sin(c.ph)) * (fl ? 2 : 1)) | 0 : (c.s === 'act' && !sit && Math.sin(clock * 4 + c.id) > .6 ? 1 : 0);
+    const b = mvg ? (Math.abs(Math.sin(c.ph)) * (fl ? 2 : 1)) | 0 : (c.s === 'act' && !sit && Math.sin(clock * 4 + c.id) > .6 ? 1 : 0);
     if (c.an) {
         drawAnimal(c, x, y, b);
         return;
     }
     if (c.tc) {
-        drawRect(x - 3, y - 9 - b, 7, 9, c.rb);
-        drawRect(x - 3, y - 2 - b, 7, 1, 'rgba(0,0,0,.25)');
-        drawRect(x - 3, y - 1 - b, 7, 1, '#d9b24a');                      // gold hem
-        drawRect(x - 3, y - 5 - b, 7, 1, '#d9b24a');                      // belt
-        drawRect(x - 2, y, 2, 1, '#3a2a1a'); drawRect(x + 1, y, 2, 1, '#3a2a1a');   // shoes peeking out
-        drawRect(x - 1, y - 9 - b, 3, 1, 'rgba(255,255,255,.35)');       // collar
-        drawRect(x, y - 8 - b, 1, 6, '#ffe066');
-        drawRect(x - 4, y - 8 - b, 1, 4, c.rb);
-        drawRect(x + 4, y - 8 - b, 1, 4, c.rb);
-        drawRect(x - 2, y - 13 - b, 5, 4, c.sk);
-        drawRect(x - 1, y - 12 - b, 1, 1, '#222');
-        drawRect(x + 1, y - 12 - b, 1, 1, '#222');
-        drawRect(x - 2, y - 10 - b, 5, 2, '#e8e0d0');
-        drawRect(x - 4, y - 14 - b, 9, 1, '#3a2a6a');
-        drawRect(x - 3, y - 16 - b, 7, 2, '#3a2a6a');
-        drawRect(x - 2, y - 18 - b, 5, 2, '#3a2a6a');
-        drawRect(x - 1, y - 20 - b, 3, 2, '#3a2a6a');
-        drawRect(x + 1, y - 18 - b, 1, 1, '#ffe066');
-        if (c.tn === 1) {
-            drawRect(x - 2, y - 12 - b, 5, 1, 'rgba(255,255,255,.5)');
-        }
-        if (c.cos) {
-            drawCostume(c, x, y - 13 - b);
-        }
-        return;
-    }
-    const o = sit ? 2 : 0;
-    if (!sit) {
-        const l = mvg && Math.sin(c.ph) > 0;
-        const lift1 = l ? 1 : 0, lift2 = mvg && !l ? 1 : 0;
-        drawRect(x - 2, y - 2 - lift1, 2, 1, '#3a3350');                 // trousers
-        drawRect(x + 1, y - 2 - lift2, 2, 1, '#3a3350');
-        drawRect(x - 3, y - 1 - lift1, 3, 1, '#7a5a3a');                 // shoes (toe pointing out)
-        drawRect(x + 1, y - 1 - lift2, 3, 1, '#7a5a3a');
-    }
-    drawRect(x - 3, y - 6 - b + o, 6, 4, c.rb);
-    drawRect(x - 3, y - 3 - b + o, 6, 1, 'rgba(0,0,0,.22)');
-    drawRect(x - 3, y - 4 - b + o, 6, 1, '#d9b24a');                       // belt
-    drawRect(x - 1, y - 6 - b + o, 2, 1, 'rgba(255,255,255,.35)');        // collar
-    drawRect(x - 3, y - 6 - b + o, 1, 2, 'rgba(255,255,255,.2)');         // light on the left
-    drawRect(x + 2, y - 5 - b + o, 1, 3, 'rgba(0,0,0,.18)');              // shade on the right
-    const ay = sc ? y - 10 - b : y - 6 - b + o;
-    drawRect(x - 4, ay, 1, 3, c.rb);
-    drawRect(x + 3, ay, 1, 3, c.rb);
-    drawRect(x - 4, ay - (sc ? 1 : -3), 1, 1, c.sk);
-    drawRect(x + 3, ay - (sc ? 1 : -3), 1, 1, c.sk);
-    drawRect(x - 2, y - 9 - b + o, 5, 3, c.sk);
-    if (sc) {
-        drawRect(x - 2, y - 9 - b + o, 1, 2, '#fff');
-        drawRect(x + 2, y - 9 - b + o, 1, 2, '#fff');
-        drawRect(x - 1, y - 8 - b + o, 1, 1, '#222');
-        drawRect(x + 1, y - 8 - b + o, 1, 1, '#222');
-        drawRect(x, y - 7 - b + o, 1, 1, '#a33');
+        drawTeacherSprite(c, x, y, b, scared);
     }
     else {
-        drawRect(x - 1, y - 8 - b + o, 1, 1, '#222');
-        drawRect(x + 1, y - 8 - b + o, 1, 1, '#222');
-        drawRect(x - 2, y - 7 - b + o, 1, 1, 'rgba(255,110,110,.55)');   // cheeks
-        drawRect(x + 2, y - 7 - b + o, 1, 1, 'rgba(255,110,110,.55)');
-        drawRect(x, y - 7 - b + o, 1, 1, '#a55');                        // smile
-    }
-    if (c.gl) {
-        drawRect(x - 2, y - 9 - b + o, 2, 2, '#222');
-        drawRect(x + 1, y - 9 - b + o, 2, 2, '#222');
-        drawRect(x - 1, y - 8 - b + o, 1, 1, '#9ad4ff');
-        drawRect(x + 1, y - 8 - b + o, 1, 1, '#9ad4ff');
-    }
-    if (c.ht) {
-        drawRect(x - 3, y - 11 - b + o, 7, 1, c.hc);
-        drawRect(x - 2, y - 12 - b + o, 5, 2, c.hc);
-        drawRect(x - 1, y - 14 - b + o, 3, 2, c.hc);
-        drawRect(x - 2, y - 11 - b + o, 5, 1, 'rgba(255,255,255,.3)');   // hat band
-        drawRect(x - 1, y - 13 - b + o, 1, 1, 'rgba(255,255,255,.25)');
-    }
-    else {                                                               // four hair styles, chosen by the character's id
-        drawRect(x - 2, y - 10 - b + o, 5, 1, c.hr);
-        drawRect(x - 3, y - 9 - b + o, 1, 2, c.hr);
-        drawRect(x + 3, y - 9 - b + o, 1, 2, c.hr);
-        const style = c.id % 4;
-        if (style === 1) drawRect(x - 2, y - 9 - b + o, 4, 1, c.hr);                                   // fringe
-        if (style === 2) { drawRect(x + 3, y - 8 - b + o, 1, 4, c.hr); drawRect(x + 4, y - 6 - b + o, 1, 2, c.hr); }   // ponytail
-        if (style === 3) { drawRect(x - 2, y - 11 - b + o, 1, 1, c.hr); drawRect(x, y - 11 - b + o, 1, 1, c.hr); drawRect(x + 2, y - 11 - b + o, 1, 1, c.hr); }   // spiky
-        drawRect(x - 2, y - 10 - b + o, 2, 1, 'rgba(255,255,255,.2)');                                 // shine
-    }
-    if (c.cos) {
-        drawCostume(c, x, y - 9 - b + o);
-    }
-    if (c.item && c.s !== 'freeze') {
-        item(c.item, x + 3, y - 3 - b + o);
+        drawStudentSprite(c, x, y, b, sit, mvg, scared);
     }
 }
+// Round face with ears, eyes with a glint, brows, cheeks, nose and mouth. hy = top of the head.
+function drawFace(c, x, hy, scared, wide) {
+    const w = wide ? 6 : 5.5;
+    drawRect(x - w / 2, hy + .5, w, 4.5, c.sk);
+    drawRect(x - w / 2 + .5, hy, w - 1, 5.5, c.sk);
+    drawRect(x + w / 2 - 1, hy + 1, 1, 3.5, 'rgba(0,0,0,.1)');                         // shade on the right cheek
+    drawRect(x - w / 2 - .5, hy + 2, .5, 1.5, c.sk); drawRect(x + w / 2, hy + 2, .5, 1.5, c.sk);   // ears
+    if (scared) {
+        drawRect(x - 2, hy + 2, 1.5, 2, '#fff'); drawRect(x + .5, hy + 2, 1.5, 2, '#fff');
+        drawRect(x - 1.5, hy + 2.5, .5, 1, '#222'); drawRect(x + 1, hy + 2.5, .5, 1, '#222');
+        drawRect(x - .5, hy + 4, 1.5, 1.5, '#8a2a2a'); drawRect(x - .5, hy + 4, 1.5, .5, '#fff');   // open mouth
+        drawRect(x - 2.5, hy + 1, 1.5, .5, 'rgba(60,30,20,.7)'); drawRect(x + 1, hy + 1, 1.5, .5, 'rgba(60,30,20,.7)');
+    }
+    else {
+        drawRect(x - 2, hy + 2.5, 1, 1.5, '#222'); drawRect(x + 1, hy + 2.5, 1, 1.5, '#222');
+        drawRect(x - 2, hy + 2.5, .5, .5, '#fff'); drawRect(x + 1, hy + 2.5, .5, .5, '#fff');   // eye glints
+        drawRect(x - 2.5, hy + 1.5, 1.5, .5, 'rgba(60,30,20,.55)'); drawRect(x + 1, hy + 1.5, 1.5, .5, 'rgba(60,30,20,.55)');
+        drawRect(x - 2.5, hy + 4, 1, .5, 'rgba(255,110,110,.5)'); drawRect(x + 1.5, hy + 4, 1, .5, 'rgba(255,110,110,.5)');   // cheeks
+        drawRect(x - .25, hy + 3.5, .5, .5, 'rgba(120,60,40,.45)');                                  // nose
+        drawRect(x - 1, hy + 4.5, 2, .5, '#a55'); drawRect(x - 1.5, hy + 4, .5, .5, '#a55'); drawRect(x + 1, hy + 4, .5, .5, '#a55');   // smile
+    }
+    if (c.gl) {
+        drawRect(x - 2.5, hy + 2, 2, 2, '#222'); drawRect(x + .5, hy + 2, 2, 2, '#222'); drawRect(x - 1, hy + 2.5, 1.5, .5, '#222');
+        drawRect(x - 2, hy + 2.5, 1, 1, '#bfe6ff'); drawRect(x + 1, hy + 2.5, 1, 1, '#bfe6ff');
+        drawRect(x - 2, hy + 2.5, .5, .5, '#fff');
+    }
+}
+function drawStudentSprite(c, x, y, b, sit, mvg, scared) {
+    const top = y - b + (sit ? 2 : 0);                                      // reference line for the body
+    const step = mvg && Math.sin(c.ph) > 0;
+    const lift1 = step ? 1 : 0, lift2 = mvg && !step ? 1 : 0;
+    const rb = c.rb;
+    if (!sit) {                                                             // trousers and shoes
+        drawRect(x - 2.5, y - 2.5 - lift1, 2, 1.5, '#3a3350'); drawRect(x + .5, y - 2.5 - lift2, 2, 1.5, '#3a3350');
+        drawRect(x - 3, y - 1 - lift1, 3, 1, '#6b4a2a'); drawRect(x - 3, y - 1 - lift1, 3, .5, '#9a7a52'); drawRect(x - 3, y - .5 - lift1, 3, .5, '#3a2410');
+        drawRect(x + .5, y - 1 - lift2, 3, 1, '#6b4a2a'); drawRect(x + .5, y - 1 - lift2, 3, .5, '#9a7a52'); drawRect(x + .5, y - .5 - lift2, 3, .5, '#3a2410');
+    }
+    drawRect(x - 3.5, top - 7, 7, 4.5, rb);                                  // robe
+    drawRect(x - 4, top - 3.5, 8, 1.5, rb);                                  // flared hem
+    drawRect(x - 4, top - 2.5, 8, .5, 'rgba(0,0,0,.25)');
+    drawRect(x - 3.5, top - 7, 1, 5, 'rgba(255,255,255,.2)');                // light from the left
+    drawRect(x + 2.5, top - 7, 1, 5, 'rgba(0,0,0,.2)');                      // shade on the right
+    drawRect(x - 1.5, top - 6, .5, 3.5, 'rgba(0,0,0,.14)'); drawRect(x + 1, top - 6, .5, 3.5, 'rgba(0,0,0,.14)');   // folds
+    drawRect(x - 3.5, top - 4.5, 7, 1, '#d9b24a'); drawRect(x - 3.5, top - 4.5, 7, .5, '#f2d67c'); drawRect(x - .5, top - 4.5, 1.5, 1, '#fff2b0');   // belt
+    drawRect(x - 1, top - 7, 2, 1.5, '#f4f0e6'); drawRect(x - .5, top - 6, 1, .5, '#d4ccb8');                  // shirt collar
+    const ay = scared ? top - 11 : top - 6.5;                                // arms: raised when scared
+    drawRect(x - 4.5, ay, 1.5, 3.5, rb); drawRect(x + 3, ay, 1.5, 3.5, rb);
+    drawRect(x - 4.5, ay + (scared ? .5 : 3), 1.5, .5, 'rgba(255,255,255,.35)'); drawRect(x + 3, ay + (scared ? .5 : 3), 1.5, .5, 'rgba(255,255,255,.35)');
+    drawRect(x - 4.5, scared ? ay - 1.5 : ay + 3.5, 1.5, 1.5, c.sk); drawRect(x + 3, scared ? ay - 1.5 : ay + 3.5, 1.5, 1.5, c.sk);   // hands
+    const hy = top - 12;
+    drawFace(c, x, hy, scared, false);
+    if (c.ht) {                                                              // pointy wizard hat
+        drawRect(x - 3.5, hy + .5, 1, 2, c.hr); drawRect(x + 2.5, hy + .5, 1, 2, c.hr);
+        drawRect(x - 4.5, hy - 1, 9, 1.5, c.hc);                             // brim
+        drawRect(x - 3, hy - 2.5, 6, 1.5, c.hc); drawRect(x - 2, hy - 4, 4, 1.5, c.hc); drawRect(x - 1, hy - 5.5, 2.5, 1.5, c.hc); drawRect(x + .5, hy - 6.5, 1.5, 1.5, c.hc);
+        drawRect(x - 3, hy - 1.5, 6, .5, 'rgba(255,215,100,.85)'); drawRect(x - .5, hy - 1.5, 1, .5, '#fff6c0');   // band and buckle
+        drawRect(x - 4.5, hy - 1, 9, .5, 'rgba(255,255,255,.18)'); drawRect(x - 2.5, hy - 2.5, 1, 1.5, 'rgba(255,255,255,.2)'); drawRect(x + 1.5, hy - 2.5, 1.5, 1.5, 'rgba(0,0,0,.2)');
+    }
+    else {                                                                   // four hair styles, chosen by id
+        const hr = c.hr, style = c.id % 4;
+        drawRect(x - 3, hy - .5, 6, 2, hr); drawRect(x - 2.5, hy - 1, 5, .5, hr);
+        drawRect(x - 3.5, hy + .5, 1, 3, hr); drawRect(x + 2.5, hy + .5, 1, 3, hr);
+        if (style === 0) { drawRect(x - 2.5, hy + 1.5, 3, .5, hr); }
+        if (style === 1) { drawRect(x - 2.5, hy + 1, 5, 1.5, hr); drawRect(x + .5, hy + 2.5, .5, .5, hr); }
+        if (style === 2) { drawRect(x + 3, hy + 1.5, 1.5, 4.5, hr); drawRect(x + 3, hy + 2.5, 1.5, .5, '#e44'); }
+        if (style === 3) { drawRect(x - 2.5, hy - 2, 1, 1.5, hr); drawRect(x - .5, hy - 2.5, 1, 2, hr); drawRect(x + 1.5, hy - 2, 1, 1.5, hr); }
+        drawRect(x - 2, hy - .5, 2, .5, 'rgba(255,255,255,.28)');           // shine
+    }
+    if (c.cos) {
+        drawCostume(c, x, hy);
+    }
+    if (c.item && c.s !== 'freeze') {
+        item(c.item, x + 4, top - 3);
+    }
+}
+function drawTeacherSprite(c, x, y, b, scared) {
+    const top = y - b;
+    const rb = c.rb, tn = c.tn;
+    drawRect(x - 2.5, y - .5, 2, 1, '#3a2a1a'); drawRect(x + .5, y - .5, 2, 1, '#3a2a1a');   // shoes under the robe
+    drawRect(x - 3.5, top - 10, 7, 9, rb); drawRect(x - 4, top - 3, 8, 3, rb);                // long robe, flared
+    drawRect(x - 4, top - 1.5, 8, 1.5, '#d9b24a'); drawRect(x - 4, top - 1.5, 8, .5, '#f2d67c'); drawRect(x - 4, top - 2, 8, .5, 'rgba(0,0,0,.25)');   // gold hem
+    drawRect(x - 3.5, top - 10, 1, 9, 'rgba(255,255,255,.2)'); drawRect(x + 2.5, top - 10, 1, 9, 'rgba(0,0,0,.22)');
+    drawRect(x - 2, top - 8, .5, 6, 'rgba(0,0,0,.14)'); drawRect(x + 1.5, top - 8, .5, 6, 'rgba(0,0,0,.14)');
+    drawRect(x - 3.5, top - 5.5, 7, 1, '#d9b24a'); drawRect(x - 3.5, top - 5.5, 7, .5, '#f2d67c'); drawRect(x - .5, top - 5.5, 1.5, 1, '#fff2b0');   // belt
+    drawRect(x - .5, top - 9, 1, 3.5, '#ffe066');                                             // golden stripe
+    [[-2.5, -3], [2, -3.5], [-1.5, -4]].forEach(([dx, dy]) => drawRect(x + dx, top + dy, .5, .5, '#ffe066'));   // embroidered stars
+    drawRect(x - 1.5, top - 10, 3, 1, 'rgba(255,255,255,.4)');
+    const ay = scared ? top - 13 : top - 9;                                                   // wide sleeves
+    drawRect(x - 5, ay, 1.5, 5, rb); drawRect(x + 3.5, ay, 1.5, 5, rb);
+    drawRect(x - 5, ay + (scared ? .5 : 4), 1.5, .5, '#d9b24a'); drawRect(x + 3.5, ay + (scared ? .5 : 4), 1.5, .5, '#d9b24a');
+    drawRect(x - 5, scared ? ay - 1.5 : ay + 4.5, 1.5, 1.5, c.sk); drawRect(x + 3.5, scared ? ay - 1.5 : ay + 4.5, 1.5, 1.5, c.sk);
+    const hy = top - 15.5, hair = ['#8a6a4a', '#e8e0d0', '#b4b4bc', '#2a1a14'][tn];
+    if (tn === 0 || tn === 3) {                                                                // long hair behind the head
+        drawRect(x - 3.5, hy + 1, 1.5, 6, hair); drawRect(x + 2.5, hy + 1, 1.5, 6, hair);
+    }
+    drawFace(c, x, hy, scared, true);
+    if (tn === 1 || tn === 2) {                                                                // white beard
+        drawRect(x - 2.5, hy + 4, 5, 2.5, '#ece6da'); drawRect(x - 1.5, hy + 6.5, 3, 1.5, '#ece6da'); drawRect(x - 1, hy + 4, 2, .5, 'rgba(0,0,0,.18)'); drawRect(x - 2.5, hy + 4, 5, .5, '#fff');
+    }
+    drawRect(x - 3, hy - .5, 6, 1.5, hair);                                                    // hair under the hat
+    if (tn === 3) { drawRect(x + 3.5, hy + 2, 1.5, 6, hair); drawRect(x + 3.5, hy + 3, 1.5, .5, '#e44'); }   // ponytail
+    if (tn === 1) { drawRect(x - 2.5, hy + 2, 2, 2, '#222'); drawRect(x + .5, hy + 2, 2, 2, '#222'); drawRect(x - 1, hy + 2.5, 1.5, .5, '#222'); drawRect(x - 2, hy + 2.5, 1, 1, '#bfe6ff'); drawRect(x + 1, hy + 2.5, 1, 1, '#bfe6ff'); }   // glasses
+    drawRect(x - 5, hy - 1, 10, 1.5, '#3a2a6a'); drawRect(x - 5, hy - 1, 10, .5, 'rgba(255,255,255,.2)');   // tall pointed hat
+    drawRect(x - 3.5, hy - 2.5, 7, 1.5, '#3a2a6a'); drawRect(x - 2.5, hy - 4.5, 5, 2, '#3a2a6a'); drawRect(x - 1.5, hy - 6.5, 3, 2, '#3a2a6a'); drawRect(x - .5, hy - 8.5, 2, 2, '#3a2a6a'); drawRect(x + 1, hy - 9.5, 1.5, 1.5, '#3a2a6a');
+    drawRect(x - 3.5, hy - 1.5, 7, .5, '#ffd84a'); drawRect(x + .5, hy - 4, 1, 1, '#ffe066'); drawRect(x - 1.5, hy - 5.5, .5, .5, '#ffe066'); drawRect(x - 2.5, hy - 2.5, 1, 1.5, 'rgba(255,255,255,.18)');
+    if (c.cos) {
+        drawCostume(c, x, hy + 1);
+    }
+}
+
+// ---- Trees: each variant is painted once into its own picture (leaf clusters, texture, light from the top-left) ----
+const TREE_W = 44, TREE_H = 58, TREE_BASE = 53;       // size of a tree picture and where the trunk base sits in it
+const treeSprites = [];
+let treeSpriteKey = '';
+function paintTree(x, y, seed) {
+    const rnd = seededRandom(seed), col = treeColors;
+    fillEllipse(x + 8, y + 1, 13, 3.5, 'rgba(0,20,0,.28)');
+    fillEllipse(x + 4, y + 1, 7, 2, 'rgba(0,20,0,.18)');
+    drawRectOutline(x - 2, y - 7.5, 4, 7.5);                                  // trunk with bark and roots
+    drawRect(x - 2, y - 7.5, 4, 7.5, '#6b4423'); drawRect(x - 2, y - 7.5, 1, 7.5, '#8e5e32'); drawRect(x + 1, y - 7.5, 1, 7.5, '#47301a');
+    for (let k = 0; k < 7; k++) drawRect(x - 1.5 + rnd() * 2.5, y - 7 + k, .5, 1, 'rgba(30,15,5,.45)');
+    drawRect(x - 3, y - 1, 1.5, 1, '#6b4423'); drawRect(x + 1.5, y - 1, 1.5, 1, '#47301a'); drawRect(x - 2.5, y - .5, 5.5, .5, '#3a2410');
+    const blobs = [[0, -16, 9, 8], [-7, -12, 6, 5.5], [7, -12, 6, 5.5], [0, -22, 6.5, 5.5], [-4, -19, 5, 4.5], [5, -19, 5, 4.5], [-9, -17, 4, 4], [9, -17, 4, 4]];
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx + 1, ry + 1, col[0]));     // dark rim
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx, y + dy, rx, ry, col[1]));
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx + rx * .18, y + dy + ry * .3, rx * .8, ry * .7, col[3]));   // shaded lower right
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx - rx * .22, y + dy - ry * .3, rx * .62, ry * .55, col[1]));
+    blobs.forEach(([dx, dy, rx, ry]) => fillEllipse(x + dx - rx * .35, y + dy - ry * .45, rx * .4, ry * .32, col[2]));  // sunlit top left
+    for (let i = 0; i < 150; i++) {                                           // leaf texture
+        const a = rnd() * 6.283, r = Math.sqrt(rnd()), bl = blobs[(rnd() * blobs.length) | 0];
+        const px = x + bl[0] + Math.cos(a) * bl[2] * r * .95, py = y + bl[1] + Math.sin(a) * bl[3] * r * .95;
+        const light = (px - x) * -.5 + (py - y + 16) * -.5;
+        drawRect(px, py, 1, .5, light > 1 ? col[2] : light < -3 ? col[0] : col[(rnd() * 4) | 0]);
+    }
+    for (let i = 0; i < 18; i++) drawRect(x - 12 + rnd() * 18, y - 28 + rnd() * 12, .5, .5, 'rgba(255,255,255,.35)');   // sun glints
+}
+function getTreeSprite(x) {
+    const key = treeColors.join();
+    if (key !== treeSpriteKey) {
+        treeSpriteKey = key;
+        treeSprites.length = 0;
+        for (let v = 0; v < 3; v++) {
+            const cv = document.createElement('canvas');
+            cv.width = TREE_W * SCALE;
+            cv.height = TREE_H * SCALE;
+            const g = cv.getContext('2d');
+            g.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+            const previous = ctx;
+            ctx = g;
+            paintTree(TREE_W / 2, TREE_BASE, 31 + v * 17);
+            ctx = previous;
+            treeSprites.push(cv);
+        }
+    }
+    return treeSprites[Math.abs(x) % 3];
+}
+function drawTreeBase(x, y) {
+    ctx.drawImage(getTreeSprite(x), x - TREE_W / 2, y - TREE_BASE, TREE_W, TREE_H);
+}
+
 /* ---------- main draw ---------- */
 // Draws everything that changes and sits on the ground: blackboard, posters, plants, pond life, ball, dropped items
 function drawMovingScenery() {
@@ -2189,7 +2411,7 @@ function drawOverlay() {
 }
 // One full frame: background, ground objects, characters sorted by height (so lower ones are in front), overlays
 function drawFrame() {
-    ctx.drawImage(backgroundCanvas, 0, 0);
+    ctx.drawImage(backgroundCanvas, 0, 0, WIDTH, HEIGHT);
     [[clock * 3, 50], [clock * 2 + 150, 140]].forEach(([x, y]) => fillEllipse(x % (WIDTH + 160) - 60, y, 45, 13, 'rgba(0,25,0,.09)'));
     drawMovingScenery();
     const L = [];
@@ -2204,6 +2426,7 @@ function drawFrame() {
     L.sort((a, b) => a[0] - b[0]);
     L.forEach(o => o[1]());
     drawMagicClassEffects();
+    drawLightOverlay();
     drawOverlay();
 }
 /* =====================================================================
@@ -2274,6 +2497,7 @@ function drawSceneDetail() {
 }
 // Animated: chimney smoke and sparkles on the pond water
 function animateSceneDetail() {
+  animatePondRipples();
   if (Math.random() < .03) spawnParticle(116, 3, '#e0e0e8', -7, 2.5, 0, 2);
   if (Math.random() < .25) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()); drawRect(265 + Math.cos(a) * 26 * r, 140 + Math.sin(a) * 13 * r, 1, 1, '#e8f6ff'); }
 }
@@ -3065,7 +3289,7 @@ function gameLoop(now) {
             onCalm();
         }
     }
-    const away = people.filter(c => !c.guest && !c.late && (c.s === 'away' || c.s === 'flee')).length;
+    const away = people.filter(c => !c.guest && !c.late && !c.gone && (c.s === 'away' || c.s === 'flee')).length;
     if (noiseMode === 'calm') {
         quietTime += dt;
         if (!away && !currentEvent) {
@@ -3104,7 +3328,7 @@ function gameLoop(now) {
         c = 'warn';
     }
     else if (away) {
-        t = `Quiet now... everyone is coming back (${44 - away}/44)`;
+        t = `Quiet now... everyone is coming back (${crowdTotal() - away}/${crowdTotal()})`;
         c = 'ok';
     }
     else if (currentEvent) {
@@ -3120,7 +3344,7 @@ function gameLoop(now) {
     byId('lv').style.width = Math.min(100, noiseLevel) + '%';
     byId('mk').style.left = th + '%';
     byId('wk').style.left = th * .7 + '%';
-    const s = `Quiet ${formatDuration(quietTime)}  At school ${44 - away - people.filter(c => c.late && c.s === 'away').length}/44`;
+    const s = `Quiet ${formatDuration(quietTime)}  At school ${crowdTotal() - away - people.filter(c => c.late && !c.gone && c.s === 'away').length}/${crowdTotal()}`;
     if (s !== infoText) {
         infoText = s;
         byId('info').textContent = s;
