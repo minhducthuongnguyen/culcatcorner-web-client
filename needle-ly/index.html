@@ -154,6 +154,8 @@ input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--line);
 body{overscroll-behavior:none}
 #viewbar button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 @media (pointer:coarse){.tb{width:46px;height:46px}.ib{width:44px;height:44px}#viewbar button{min-height:40px;min-width:40px}#viewbar input[type=range]{height:32px;width:140px}.btn,.seg button{min-height:40px}.th{padding:8px 6px}.sw{height:30px}}
+.fam button{padding:3px 9px;font-size:12px;display:inline-flex;align-items:center;gap:5px}.fd{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.35);display:inline-block}.fam button[aria-pressed="true"] .mute{color:inherit;opacity:.85}
+.pc h3[data-p]{cursor:text}.pc h3[data-p]:hover{text-decoration:underline dotted}.pc .rn{width:100%;font:inherit;font-weight:700;font-size:15px;padding:2px 6px}.pc select{font-size:13px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .nudge{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:4px;align-items:center}
 .nudge input{text-align:center;padding:6px 4px}
@@ -429,6 +431,14 @@ function makeWool(){const hues=[['Poppy',2],['Ember',16],['Marigold',38],['Saffr
   hues.forEach(([n,h])=>tones.forEach(([t,s,l])=>out.push({name:n+' '+t,hex:hsl2hex(h,s,l).toUpperCase()})));
   [['Snow','#FAFAF7'],['Cream','#EFE6D0'],['Oat','#D9CBB0'],['Fawn','#B79C78'],['Camel','#8C6A44'],['Walnut','#5A402A'],['Espresso','#33241A'],['Dove','#C9CBCC'],['Pewter','#8D9296'],['Slate','#565C63'],['Charcoal','#2E3237'],['Ink','#101214']].forEach(([n,h])=>out.push({name:n,hex:h.toUpperCase()}));
   return out.map((o,i)=>({code:'NW-'+String(i+1).padStart(3,'0'),name:o.name,hex:o.hex}))}
+const FAMS=[['Whites & creams','#F3EBDD'],['Yellows & golds','#F5C400'],['Oranges','#F2793A'],['Reds','#C72B3B'],['Pinks','#F59DB4'],['Purples','#835B8B'],['Blues','#3A6FB0'],['Teals & aquas','#2FA39B'],['Greens','#47A72F'],['Browns & tans','#8F5A2F'],['Grays','#8A8A8A'],['Blacks','#101010']],famCache=new Map();
+function famOf(hex){let r=famCache.get(hex);if(r)return r;const[R,G,B]=hex2rgb(hex).map(v=>v/255),mx=Math.max(R,G,B),mn=Math.min(R,G,B),l=(mx+mn)/2,d=mx-mn,s=d?d/(1-Math.abs(2*l-1)):0;let h=0;if(d){h=mx===R?((G-B)/d)%6:mx===G?(B-R)/d+2:(R-G)/d+4;h=(h*60+360)%360}
+  r=l<.13?'Blacks':(l>.9&&s<.6)||(s<.13&&l>.82)?'Whites & creams':s<.13?'Grays'
+   :(h<14||h>=335)?((l>.68||s<.4)?'Pinks':'Reds')
+   :h<45?(s>.75&&l>.35&&l<.78?'Oranges':l>.88?'Whites & creams':'Browns & tans')
+   :h<70?((s>.5&&l>.42)?'Yellows & golds':l>.8?'Whites & creams':h>=58?'Greens':'Browns & tans')
+   :h<165?'Greens':h<195?'Teals & aquas':h<255?'Blues':'Purples';
+  famCache.set(hex,r);return r}
 const BRANDS={DMC:parseLib(DMC_RAW),'Needle-ly Wool':makeWool()};
 const CUSTOM=lsGet('nl:brands',{});Object.keys(CUSTOM).forEach(k=>BRANDS[k]=CUSTOM[k]);
 const libOf=b=>BRANDS[b]&&BRANDS[b].length?BRANDS[b]:BRANDS.DMC;
@@ -447,29 +457,30 @@ function deserialize(o){const P=newProject(o.w,o.h,o.count,o.name);Object.assign
   if(P.bg&&P.bg.w==null)P.bg.w=(P.bg.s||1)*P.w;
   P.cells=unrle(o.cells,o.w*o.h,Uint16Array);P.done=unrle(o.done,o.w*o.h,Uint8Array);return P}
 /* ---- project storage: IndexedDB (large), localStorage fallback, in-memory mirror so the rest of the app stays synchronous ---- */
-const STORE={idx:[],last:null,proj:{},bgw:{},db:null};
+const STORE={idx:[],last:null,proj:{},bgw:{},db:null,folders:[],pf:{}};
 function idbOpen(){return new Promise((res,rej)=>{try{if(!window.indexedDB)return rej(new Error('no idb'));const r=indexedDB.open('needlely',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv')};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'))}catch(e){rej(e)}})}
 function idbTx(mode,fn){return new Promise((res,rej)=>{try{const tx=STORE.db.transaction('kv',mode),req=fn(tx.objectStore('kv'));tx.oncomplete=()=>res(req&&req.result);tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error||new Error('aborted'))}catch(e){rej(e)}})}
 function setSaveState(ok){const el=$('#saveState');if(!el)return;if(ok){el.className='small mute';el.textContent='Saved '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}else{el.className='small bad';el.textContent='Not saved: browser storage is blocked or full. Use Export → Save project file.'}}
-function lsPutFor(key){try{if(key==='meta')return lsSet('nl:idx',STORE.idx)&&lsSet('nl:last',STORE.last);if(key.startsWith('p:')){const id=key.slice(2);return STORE.proj[id]?lsSet('nl:p:'+id,STORE.proj[id]):true}return true}catch(e){return false}}
+function lsPutFor(key){try{if(key==='meta')return lsSet('nl:idx',STORE.idx)&&lsSet('nl:last',STORE.last)&&lsSet('nl:folders',{f:STORE.folders,pf:STORE.pf});if(key.startsWith('p:')){const id=key.slice(2);return STORE.proj[id]?lsSet('nl:p:'+id,STORE.proj[id]):true}return true}catch(e){return false}}
 function kvPut(key,val){if(STORE.db)return idbTx('readwrite',st=>st.put(val,key)).then(()=>{setSaveState(true);return true},()=>{const ok=lsPutFor(key);setSaveState(ok);return false});const ok=lsPutFor(key);setSaveState(ok);return Promise.resolve(ok)}
 function kvDel(key){if(STORE.db)idbTx('readwrite',st=>st.delete(key)).catch(()=>{})}
 function putProject(id){const o=STORE.proj[id];if(!o)return Promise.resolve([true]);const src=o.bg&&o.bg.src,jobs=[];
   if(STORE.db&&src){if(STORE.bgw[id]!==src){STORE.bgw[id]=src;jobs.push(kvPut('bg:'+id,src))}jobs.push(kvPut('p:'+id,Object.assign({},o,{bg:Object.assign({},o.bg,{src:'@ref'})})))}
   else{if(STORE.db&&STORE.bgw[id]){delete STORE.bgw[id];kvDel('bg:'+id)}jobs.push(kvPut('p:'+id,o))}return Promise.all(jobs)}
-const putMeta=()=>kvPut('meta',{idx:STORE.idx.slice(),last:STORE.last});
+const putMeta=()=>kvPut('meta',{idx:STORE.idx.slice(),last:STORE.last,folders:JSON.parse(JSON.stringify(STORE.folders)),pf:Object.assign({},STORE.pf)});
 function snapObj(P){const o=serialize(P);['frac','lines','knots','beads','pal','meta'].forEach(k=>{o[k]=JSON.parse(JSON.stringify(o[k]))});o.bg=o.bg?Object.assign({},o.bg):null;return o}
 const loadIndex=()=>STORE.idx;
-function saveProject(P){P.updated=Date.now();STORE.proj[P.id]=snapObj(P);if(!STORE.idx.includes(P.id))STORE.idx.unshift(P.id);STORE.last=P.id;putProject(P.id);putMeta();return true}
+function saveProject(P){P.updated=Date.now();STORE.proj[P.id]=snapObj(P);if(!STORE.idx.includes(P.id)){STORE.idx.unshift(P.id);const vf=V.fold;if(vf&&vf!=='all'&&vf!=='none'&&STORE.folders.some(f=>f.id===vf))STORE.pf[P.id]=vf}STORE.last=P.id;putProject(P.id);putMeta();return true}
 const loadProject=id=>STORE.proj[id]?deserialize(STORE.proj[id]):null;
-function deleteProject(id){delete STORE.proj[id];STORE.idx=STORE.idx.filter(x=>x!==id);delete STORE.bgw[id];kvDel('p:'+id);kvDel('bg:'+id);lsDel('nl:p:'+id);putMeta()}
+function deleteProject(id){delete STORE.proj[id];STORE.idx=STORE.idx.filter(x=>x!==id);delete STORE.bgw[id];kvDel('p:'+id);kvDel('bg:'+id);lsDel('nl:p:'+id);delete STORE.pf[id];putMeta()}
 async function bootStore(){try{
   try{STORE.db=await idbOpen()}catch(e){STORE.db=null}
   if(STORE.db){try{const keys=await idbTx('readonly',st=>st.getAllKeys()),vals=await idbTx('readonly',st=>st.getAll()),kv={};keys.forEach((k,i)=>kv[k]=vals[i]);const meta=kv.meta||{};
     Object.keys(kv).filter(k=>k.startsWith('p:')).forEach(k=>{const id=k.slice(2),o=kv[k];if(!o||!o.w)return;if(o.bg&&o.bg.src==='@ref'){o.bg.src=kv['bg:'+id]||'';STORE.bgw[id]=o.bg.src;if(!o.bg.src)o.bg=null}STORE.proj[id]=o});
-    STORE.idx=(meta.idx||[]).filter(id=>STORE.proj[id]);Object.keys(STORE.proj).forEach(id=>{if(!STORE.idx.includes(id))STORE.idx.push(id)});STORE.last=meta.last||null}catch(e){STORE.db=null}}
+    STORE.idx=(meta.idx||[]).filter(id=>STORE.proj[id]);Object.keys(STORE.proj).forEach(id=>{if(!STORE.idx.includes(id))STORE.idx.push(id)});STORE.last=meta.last||null;STORE.folders=meta.folders||[];STORE.pf=meta.pf||{}}catch(e){STORE.db=null}}
   let mig=0;lsGet('nl:idx',[]).forEach(id=>{if(STORE.proj[id])return;const o=lsGet('nl:p:'+id,null);if(o&&o.w){STORE.proj[id]=o;STORE.idx.push(id);mig++}});
   if(!STORE.last)STORE.last=lsGet('nl:last',null);
+  if(!STORE.folders.length){const lf=lsGet('nl:folders',null);if(lf){STORE.folders=lf.f||[];STORE.pf=lf.pf||{}}}
   if(STORE.db&&mig){const r=await Promise.all(STORE.idx.map(putProject));await putMeta();if(r.flat().every(Boolean)){lsGet('nl:idx',[]).forEach(id=>lsDel('nl:p:'+id));lsDel('nl:idx');lsDel('nl:last')}}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
 }catch(e){}}
@@ -792,15 +803,17 @@ function pasteMode(){if(!V.clip){toast('Copy something first');return}V.tool='se
 function modal(title,html,wide){const r=$('#modalRoot');r.innerHTML=`<div class="scrim"><div class="dlg${wide?' wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button class="x" aria-label="Close">✕</button></header><div class="dbody">${html}</div></div></div>`;
   const sc=r.firstChild;sc.addEventListener('pointerdown',e=>{if(e.target===sc)closeModal()});$('.x',r).onclick=closeModal;return $('.dbody',r)}
 const closeModal=()=>{$('#modalRoot').innerHTML=''};
-function pickThread(cb,title){let b=Object.keys(BRANDS)[0],q='';
-  const body=modal(title||'Add thread',`<div class="seg" id="tpB"></div><div class="field" style="margin:8px 0 0"><input type="text" id="tpQ" placeholder="Search by code or name" aria-label="Search threads"></div><div class="sgrid" id="tpG"></div>
+function pickThread(cb,title){let b=Object.keys(BRANDS)[0],q='',f='';
+  const body=modal(title||'Add thread',`<div class="seg" id="tpB"></div><div class="field" style="margin:8px 0 0"><input type="text" id="tpQ" placeholder="Search by code or name" aria-label="Search threads"></div><div class="seg fam" id="tpF" style="margin-top:8px"></div><div class="sgrid" id="tpG"></div>
   <details style="margin-top:12px"><summary>Add your own colour</summary><div class="pair" style="margin-top:8px"><div class="field"><label>Code</label><input type="text" id="cuC" value="C1"></div><div class="field"><label>Name</label><input type="text" id="cuN" value="Custom"></div></div><div class="field row"><label>Colour</label><input type="color" id="cuH" value="#c0392b"></div><button class="btn" id="cuA">Add to “My threads”</button></details>
   <details style="margin-top:8px"><summary>Import a thread list (CSV)</summary><div class="field" style="margin-top:8px"><label>Brand name</label><input type="text" id="imB" value="Anchor"></div><div class="field"><label>One thread per line: code, name, #hex</label><textarea id="imT" rows="5" placeholder="403, Black, #000000&#10;1, White, #FFFFFF"></textarea></div><button class="btn" id="imA">Import list</button></details>`);
   function render(){$('#tpB',body).innerHTML=Object.keys(BRANDS).map(k=>`<button data-b="${esc(k)}" aria-pressed="${k===b}">${esc(k)}</button>`).join('');
-    const L=libOf(b).filter(t=>!q||(t.code+' '+t.name).toLowerCase().includes(q)),inP=t=>P.pal.some(e=>e.b===b&&e.code===t.code);
+    const base=libOf(b).filter(t=>!q||(t.code+' '+t.name).toLowerCase().includes(q)),cn={};base.forEach(t=>{const k=famOf(t.hex);cn[k]=(cn[k]||0)+1});if(f&&!cn[f])f='';
+    $('#tpF',body).innerHTML=`<button data-f="" aria-pressed="${!f}">All <span class="mute">${base.length}</span></button>`+FAMS.filter(x=>cn[x[0]]).map(([k,c])=>`<button data-f="${esc(k)}" aria-pressed="${f===k}"><i class="fd" style="background:${c}"></i>${esc(k)} <span class="mute">${cn[k]}</span></button>`).join('');
+    const L=f?base.filter(t=>famOf(t.hex)===f).sort((x,y)=>lum(y.hex)-lum(x.hex)):base,inP=t=>P.pal.some(e=>e.b===b&&e.code===t.code);
     $('#tpG',body).innerHTML=L.map((t,i)=>`<button data-i="${i}" title="${esc(t.name)}"><span class="sw" style="background:${t.hex}"></span><span><b class="mono small">${esc(t.code)}${inP(t)?' ✓':''}</b><small>${esc(t.name)}</small></span></button>`).join('')||'<p class="mute small">No match.</p>';
     $('#tpG',body).onclick=e=>{const x=e.target.closest('[data-i]');if(!x)return;const t=L[+x.dataset.i];cb(t,b);if(!title||title==='Add thread')render()}}
-  $('#tpB',body).onclick=e=>{const x=e.target.closest('[data-b]');if(x){b=x.dataset.b;render()}};$('#tpQ',body).oninput=e=>{q=e.target.value.toLowerCase();render()};
+  $('#tpB',body).onclick=e=>{const x=e.target.closest('[data-b]');if(x){b=x.dataset.b;render()}};$('#tpQ',body).oninput=e=>{q=e.target.value.toLowerCase();render()};$('#tpF',body).onclick=e=>{const x=e.target.closest('[data-f]');if(x){f=x.dataset.f;render()}};
   $('#cuA',body).onclick=()=>{const t={code:$('#cuC',body).value||'C',name:$('#cuN',body).value||'Custom',hex:$('#cuH',body).value.toUpperCase()};(BRANDS['My threads']=BRANDS['My threads']||[]).push(t);CUSTOM['My threads']=BRANDS['My threads'];lsSet('nl:brands',CUSTOM);b='My threads';render();toast('Added to My threads')};
   $('#imA',body).onclick=()=>{const name=$('#imB',body).value.trim()||'Imported',L=[];$('#imT',body).value.split('\n').forEach(l=>{const a=l.split(/[,\t;]/).map(s=>s.trim());const hx=a.find(s=>/^#?[0-9a-f]{6}$/i.test(s));if(a.length>=2&&hx)L.push({code:a[0],name:a.length>=3?a[1]:a[0],hex:'#'+hx.replace('#','').toUpperCase()})});
     if(!L.length){toast('No valid lines found. Each line needs a code and a 6-digit hex colour.');return}BRANDS[name]=L;CUSTOM[name]=L;lsSet('nl:brands',CUSTOM);b=name;render();toast(L.length+' threads imported into '+name)};
@@ -1101,17 +1114,43 @@ async function savePreviewImage(){const z=Math.max(6,Math.min(24,Math.floor(2600
 function drawThumb(c,p){const W=c.width=420,Hh=c.height=300,x=c.getContext('2d');x.fillStyle=css('--fabric');x.fillRect(0,0,W,Hh);const z=Math.min((W-16)/p.w,(Hh-16)/p.h),ox=(W-p.w*z)/2,oy=(Hh-p.h*z)/2;
   for(let i=0;i<p.cells.length;i++){const id=p.cells[i];if(id&&p.pal[id-1]){x.fillStyle=p.pal[id-1].hex;x.fillRect(ox+(i%p.w)*z,oy+Math.floor(i/p.w)*z,z+.5,z+.5)}}}
 function renderProjects(){const st=$('#projStage'),ids=loadIndex().slice();if(P&&!ids.includes(P.id)){saveProject(P);ids.unshift(P.id)}
-  const list=ids.map(id=>id===P.id?P:loadProject(id)).filter(Boolean).sort((a,b)=>(b.updated||0)-(a.updated||0));
+  const fl=STORE.folders,fid=p=>{const f=STORE.pf[p.id];return fl.some(x=>x.id===f)?f:''};
+  const all=ids.map(id=>id===P.id?P:loadProject(id)).filter(Boolean).sort((a,b)=>(b.updated||0)-(a.updated||0));
+  let cur=V.fold||'all';if(cur!=='all'&&cur!=='none'&&!fl.some(f=>f.id===cur))cur='all';V.fold=cur;
+  const cnt=id=>all.filter(p=>fid(p)===id).length,list=all.filter(p=>cur==='all'||(cur==='none'?!fid(p):fid(p)===cur)),
+    fb=(id,label,c)=>`<button data-p="fold" data-id="${id}" aria-pressed="${cur===id}">${label} <span class="mute">${c}</span></button>`,
+    opts=cf=>`<option value="">Unfiled</option>`+fl.map(f=>`<option value="${f.id}" ${f.id===cf?'selected':''}>${esc(f.name)}</option>`).join('')+`<option value="__new">+ New folder…</option>`;
   st.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><h1 style="font-size:28px">Projects</h1><div class="grow"></div><button class="btn pri" data-p="new">New blank canvas</button><button class="btn" data-p="photo">From a photo or pixel art</button><button class="btn" data-p="open">Open project, backup or Needle-ly PDF</button><button class="btn" data-p="backup">Back up all projects</button></div>
+  <div class="seg fam" style="margin-top:12px">${fb('all','All projects',all.length)}${fl.map(f=>fb(f.id,'📁 '+esc(f.name),cnt(f.id))).join('')}${fb('none','Unfiled',all.filter(p=>!fid(p)).length)}<button data-p="newfold">+ New folder</button></div>
+  ${fl.some(f=>f.id===cur)?`<div class="btns" style="margin-top:8px"><button class="btn sm" data-p="renfold">Rename folder</button><button class="btn sm danger" data-p="delfold">${V.delFold===cur?'Tap again to delete (projects move to Unfiled)':'Delete folder'}</button></div>`:''}
   <div class="pgrid">${list.map(p=>{let t=0,d=0;for(let i=0;i<p.cells.length;i++)if(p.cells[i]||p.frac[i]){t++;if(p.done[i])d++}const pc=t?Math.round(d/t*100):0;
-    return`<article class="pc" data-id="${p.id}" aria-current="${p.id===P.id}"><canvas data-th="${p.id}"></canvas><div class="in"><h3>${esc(p.name)}</h3><div class="small mute mono">${p.w}×${p.h} · ${p.count} ct · ${p.pal.length} threads</div><div class="bar"><i style="width:${pc}%"></i></div><div class="small mute">${pc}% stitched · edited ${new Date(p.updated).toLocaleDateString()}</div>
-    <div class="btns"><button class="btn sm pri" data-p="load" data-id="${p.id}">${p.id===P.id?'Continue':'Open'}</button><button class="btn sm" data-p="dup" data-id="${p.id}">Duplicate</button><button class="btn sm danger" data-p="del" data-id="${p.id}">${V.delId===p.id?'Tap again to delete':'Delete'}</button></div></div></article>`}).join('')}</div>
+    const title=V.renId===p.id?`<input class="rn" data-rn="${p.id}" value="${esc(p.name)}" maxlength="80" aria-label="Project name">`:`<h3 data-p="rename" data-id="${p.id}" title="Click to rename">${esc(p.name)}</h3>`;
+    return`<article class="pc" data-id="${p.id}" aria-current="${p.id===P.id}"><canvas data-th="${p.id}"></canvas><div class="in">${title}<div class="small mute mono">${p.w}×${p.h} · ${p.count} ct · ${p.pal.length} threads</div><div class="bar"><i style="width:${pc}%"></i></div><div class="small mute">${pc}% stitched · edited ${new Date(p.updated).toLocaleDateString()}</div>
+    <label class="small mute" style="display:flex;gap:6px;align-items:center">Folder <select data-mv="${p.id}" style="flex:1;min-width:0" aria-label="Move to folder">${opts(fid(p))}</select></label>
+    <div class="btns"><button class="btn sm pri" data-p="load" data-id="${p.id}">${p.id===P.id?'Continue':'Open'}</button><button class="btn sm" data-p="rename" data-id="${p.id}">Rename</button><button class="btn sm" data-p="dup" data-id="${p.id}">Duplicate</button><button class="btn sm danger" data-p="del" data-id="${p.id}">${V.delId===p.id?'Tap again to delete':'Delete'}</button></div></div></article>`}).join('')}${list.length?'':'<p class="mute small" style="grid-column:1/-1">No projects here yet. Use the Folder menu on a project to move it in.</p>'}</div>
   <p class="small mute" style="margin-top:16px">Projects save automatically in this browser as you work, so they are here next time you open Needle-ly. Browsers can clear site data, and a different browser or device starts empty, so press Back up all projects now and then and keep the file. Open it here to restore everything.</p>`;
-  list.forEach(p=>{const c=st.querySelector(`[data-th="${p.id}"]`);if(c)drawThumb(c,p)})}
+  list.forEach(p=>{const c=st.querySelector(`[data-th="${p.id}"]`);if(c)drawThumb(c,p)});
+  const ri=st.querySelector('[data-rn]');if(ri){ri.focus();ri.select()}}
+function commitRename(id,val,save){if(V.renId!==id)return;V.renId=null;val=(val||'').trim();
+  if(save&&val){if(P&&P.id===id){P.name=val;$('#pname').value=val;saveProject(P)}else if(STORE.proj[id]){STORE.proj[id].name=val;putProject(id)}}renderProjects()}
+function folderDialog(title,init,ok){const body=modal(title,`<div class="field"><label>Folder name</label><input type="text" id="fdN" maxlength="40" value="${esc(init)}"></div><div class="dfoot"><button class="btn" data-x>Cancel</button><button class="btn pri" id="fdOk">Save</button></div>`);
+  const i=$('#fdN',body);i.focus();i.select();const go=()=>{const v=i.value.trim();if(!v)return;closeModal();ok(v)};$('[data-x]',body).onclick=closeModal;$('#fdOk',body).onclick=go;i.onkeydown=e=>{if(e.key==='Enter')go()}}
+function moveProject(id,val){if(val==='__new'){folderDialog('New folder','',n=>{const f={id:uid(),name:n};STORE.folders.push(f);STORE.pf[id]=f.id;putMeta();renderProjects();toast('Moved to '+n)});renderProjects();return}
+  if(val)STORE.pf[id]=val;else delete STORE.pf[id];putMeta();renderProjects();toast(val?'Moved to '+STORE.folders.find(f=>f.id===val).name:'Moved to Unfiled')}
+(()=>{const ps=$('#projStage');
+  ps.addEventListener('keydown',e=>{const t=e.target.closest&&e.target.closest('[data-rn]');if(!t)return;if(e.key==='Enter'){e.preventDefault();commitRename(t.dataset.rn,t.value,true)}else if(e.key==='Escape')commitRename(t.dataset.rn,'',false)});
+  ps.addEventListener('focusout',e=>{const t=e.target.closest&&e.target.closest('[data-rn]');if(t)commitRename(t.dataset.rn,t.value,true)});
+  ps.addEventListener('change',e=>{const m=e.target.closest&&e.target.closest('[data-mv]');if(m)moveProject(m.dataset.mv,m.value)})})();
 $('#projStage').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;const a=b.dataset.p,id=b.dataset.id;
-  if(a==='backup'){backupAll();return}if(a==='new')openNew();else if(a==='photo'){$('#fPhoto').value='';$('#fPhoto').click()}else if(a==='open'){$('#fProj').value='';$('#fProj').click()}
+  if(a==='backup'){backupAll();return}
+  if(a==='fold'){V.fold=id;V.delFold=null;renderProjects();return}
+  if(a==='rename'){V.renId=id;renderProjects();return}
+  if(a==='newfold'){folderDialog('New folder','',n=>{const f={id:uid(),name:n};STORE.folders.push(f);V.fold=f.id;putMeta();renderProjects()});return}
+  if(a==='renfold'){const f=STORE.folders.find(x=>x.id===V.fold);if(f)folderDialog('Rename folder',f.name,n=>{f.name=n;putMeta();renderProjects()});return}
+  if(a==='delfold'){const cur=V.fold;if(V.delFold!==cur){V.delFold=cur;renderProjects();setTimeout(()=>{V.delFold=null;if(V.tab==='projects')renderProjects()},4000);return}
+    V.delFold=null;STORE.folders=STORE.folders.filter(f=>f.id!==cur);Object.keys(STORE.pf).forEach(k=>{if(STORE.pf[k]===cur)delete STORE.pf[k]});V.fold='all';putMeta();renderProjects();return}if(a==='new')openNew();else if(a==='photo'){$('#fPhoto').value='';$('#fPhoto').click()}else if(a==='open'){$('#fProj').value='';$('#fProj').click()}
   else if(a==='load'){if(id!==P.id){saveProject(P);const p=loadProject(id);if(p)openProject(p)}setTab('design')}
-  else if(a==='dup'){const src=id===P.id?P:loadProject(id),o=JSON.parse(JSON.stringify(serialize(src)));o.id=uid();o.name=src.name+' copy';const p=deserialize(o);saveProject(p);renderProjects();toast('Duplicated')}
+  else if(a==='dup'){const src=id===P.id?P:loadProject(id),o=JSON.parse(JSON.stringify(serialize(src)));o.id=uid();o.name=src.name+' copy';const p=deserialize(o);saveProject(p);const sf=STORE.pf[src.id];if(sf)STORE.pf[p.id]=sf;else delete STORE.pf[p.id];putMeta();renderProjects();toast('Duplicated')}
   else if(a==='del'){if(V.delId!==id){V.delId=id;renderProjects();setTimeout(()=>{V.delId=null;if(V.tab==='projects')renderProjects()},4000);return}V.delId=null;deleteProject(id);
     if(id===P.id){const rest=loadIndex();const p=rest.length?loadProject(rest[0]):makeBlank();openProject(p)}renderProjects()}});
 $('#fProj').onchange=e=>{const f=e.target.files[0];if(!f)return;const pdf=/\.pdf$/i.test(f.name)||f.type==='application/pdf',r=new FileReader();
@@ -1122,9 +1161,10 @@ $('#fProj').onchange=e=>{const f=e.target.files[0];if(!f)return;const pdf=/\.pdf
     if(!o.w||!o.h||o.cells==null)throw 0;o.id=uid();const p=deserialize(o);saveProject(P);openProject(p);setTab('design');toast('Opened '+p.name)}catch(_){toast('That is not a Needle-ly project file.')}};
   pdf?r.readAsArrayBuffer(f):r.readAsText(f)};
 async function backupAll(){saveProject(P);const list=STORE.idx.map(id=>id===P.id?serialize(P):STORE.proj[id]).filter(Boolean),d=new Date().toISOString().slice(0,10);
-  await saveFile('needlely-backup-'+d+'.json',new Blob([JSON.stringify({nlBackup:1,exported:Date.now(),projects:list})],{type:'application/json'}))}
+  await saveFile('needlely-backup-'+d+'.json',new Blob([JSON.stringify({nlBackup:1,exported:Date.now(),projects:list,folders:STORE.folders,pf:STORE.pf})],{type:'application/json'}))}
 function restoreBackup(o){let n=0,sk=0,reopen=null;o.projects.forEach(q=>{if(!q||!q.w||!q.h||q.cells==null)return;const id=q.id||uid(),have=(P&&P.id===id)?serialize(P):STORE.proj[id];
     if(have&&(have.updated||0)>=(q.updated||0)){sk++;return}q.id=id;STORE.proj[id]=q;if(!STORE.idx.includes(id))STORE.idx.push(id);putProject(id);if(P&&P.id===id)reopen=id;n++});
+  if(Array.isArray(o.folders)){o.folders.forEach(f=>{if(f&&f.id&&!STORE.folders.some(x=>x.id===f.id))STORE.folders.push({id:f.id,name:String(f.name||'Folder')})});Object.keys(o.pf||{}).forEach(id=>{if(STORE.proj[id]&&!STORE.pf[id]&&STORE.folders.some(f=>f.id===o.pf[id]))STORE.pf[id]=o.pf[id]})}
   putMeta();if(reopen)openProject(deserialize(STORE.proj[reopen]));if(V.tab==='projects')renderProjects();toast('Restored '+n+' project'+(n===1?'':'s')+(sk?', skipped '+sk+' already up to date':''))}
 function makeBlank(){const p=newProject(60,60,14,'Untitled canvas');p.pal.push({b:'DMC',code:'310',name:'Black',hex:'#000000',sym:SYMS[0]});return p}
 function openNew(){const body=modal('New blank canvas',`<div class="field"><label>Name</label><input type="text" id="nwN" value="Untitled canvas"></div><div class="pair"><div class="field"><label>Mesh / fabric count</label><select id="nwC">${COUNTS.map(c=>`<option ${c===14?'selected':''}>${c}</option>`).join('')}</select></div><div class="field"><label>Size in</label><select id="nwU"><option value="st">Stitches</option><option value="in">Inches</option><option value="cm">Centimetres</option></select></div></div>
