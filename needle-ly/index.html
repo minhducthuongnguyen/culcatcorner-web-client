@@ -902,11 +902,12 @@ function removeThread(i){const u=used(),e=P.pal[i];
   const others=P.pal.map((x,j)=>[x,j]).filter(a=>a[1]!==i);
   const body=modal('Remove thread',`<p style="margin-top:0">${esc(e.code)} ${esc(e.name)} is used in this pattern.</p><div class="field"><label>What should happen to its stitches?</label><select id="rtS"><option value="del">Delete them</option>${others.map(([x,j])=>`<option value="${j}">Merge into ${esc(x.code)} ${esc(x.name)}</option>`).join('')}</select></div><div class="dfoot"><button class="btn" data-x>Cancel</button><button class="btn pri" id="rtOk">Remove thread</button></div>`);
   $('[data-x]',body).onclick=closeModal;$('#rtOk',body).onclick=()=>{const v=$('#rtS',body).value;pushH();if(v==='del')purgeThread(i);else replaceThread(i,+v);dropThread(i);closeModal();afterChange()}}
-$('#fTrace').onchange=e=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f),img=new Image();
-  img.onload=()=>{const sc=Math.min(1,2400/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*sc));c.height=Math.max(1,Math.round(img.naturalHeight*sc));c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
-    const keepAlpha=/png|gif|webp|svg/.test(f.type);pushH();P.bg={src:c.toDataURL(keepAlpha?'image/png':'image/jpeg',.9),op:.5,w:P.w,r:0,x:0,y:0};afterChange()};
-  img.onerror=()=>toast('That file could not be read as an image.');img.src=url};
-$('#fPhoto').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();img.onload=()=>openWizard(img,f.name.replace(/\.[^.]+$/,''));img.onerror=()=>toast('That file could not be read as an image.');img.src=URL.createObjectURL(f)};
+function readImg(f,ok){const r=new FileReader(),bad=()=>toast('That file could not be read as an image ('+(f.type||'unknown type')+'). Try a PNG or JPG.');
+  r.onerror=bad;r.onload=()=>{let u=String(r.result);if(!/^data:image\//.test(u)){const ext=((f.name.split('.').pop()||'png').toLowerCase()).replace('jpg','jpeg');u=u.replace(/^data:[^,]*/,'data:image/'+ext+';base64')}
+    const i=new Image();i.onload=()=>ok(i);i.onerror=bad;i.src=u};r.readAsDataURL(f)}
+$('#fTrace').onchange=e=>{const f=e.target.files[0];if(!f)return;readImg(f,img=>{const sc=Math.min(1,2400/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*sc));c.height=Math.max(1,Math.round(img.naturalHeight*sc));c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const keepAlpha=/png|gif|webp|svg/.test(f.type);pushH();P.bg={src:c.toDataURL(keepAlpha?'image/png':'image/jpeg',.9),op:.5,w:P.w,r:0,x:0,y:0};afterChange()})};
+$('#fPhoto').onchange=e=>{const f=e.target.files[0];if(!f)return;readImg(f,img=>openWizard(img,f.name.replace(/\.[^.]+$/,'')))};
 
 /* ================= photo wizard ================= */
 function detectBlock(src){const w=src.naturalWidth||src.width,h=src.naturalHeight||src.height;if(w*h>4e6)return 1;const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(src,0,0);const d=x.getImageData(0,0,w,h).data,gcd=(a,b)=>b?gcd(b,a%b):a,same=(i,j)=>d[i]===d[j]&&d[i+1]===d[j+1]&&d[i+2]===d[j+2]&&d[i+3]===d[j+3];let g=0;
@@ -1104,7 +1105,7 @@ function EXPK(k,t){const m=P.meta;
   if(k==='inc'){EO[t.dataset.n]=t.checked;EO.page=0;renderPageOnly();return}
   if(k==='strands')P.strands=clamp(+t.value||1,1,12);else if(k==='waste')P.waste=clamp(+t.value||0,0,100);else m[k]=t.value;
   scheduleSave();clearTimeout(EXPK.t);EXPK.t=setTimeout(renderPageOnly,150)}
-$('#fLogo').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();img.onload=()=>{const s=Math.min(1,500/img.naturalWidth,300/img.naturalHeight),c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);P.meta.logo=c.toDataURL('image/png');scheduleSave();renderExport()};img.onerror=()=>toast('That file could not be read as an image.');img.src=URL.createObjectURL(f)};
+$('#fLogo').onchange=e=>{const f=e.target.files[0];if(!f)return;readImg(f,img=>{const s=Math.min(1,500/img.naturalWidth,300/img.naturalHeight),c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);P.meta.logo=c.toDataURL('image/png');scheduleSave();renderExport()})};
 async function savePreviewImage(){const z=Math.max(6,Math.min(24,Math.floor(2600/Math.max(P.w,P.h)))),pad=30,c=document.createElement('canvas');c.width=P.w*z+pad*2;c.height=P.h*z+pad*2;const x=c.getContext('2d');
   x.fillStyle=FAB[V.sim.fabric]||FAB.aida;x.fillRect(0,0,c.width,c.height);const fab=FAB[V.sim.fabric]||FAB.aida,o=pOpts(fab,V.sim.style==='pix'?'cross':V.sim.style);
   for(let cy=0;cy<P.h;cy++)for(let cx=0;cx<P.w;cx++)paintCell(x,cx,cy,pad+cx*z,pad+cy*z,z,V.sim.style==='pix'?'flat':'sim',o);if(V.sim.bs)paintExtras(x,pad,pad,z,{outline:false,hl:-1});
@@ -1192,7 +1193,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&P)saveProj
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{needDraw();if(V.tab==='export')renderPageOnly()});
 wireSide();
 try{if(window.claude&&claude.use)claude.use('downloads').then(d=>{DL=d;if(V.tab==='export')renderSide()},()=>{})}catch(_){}
-bootStore().then(()=>{let p=null;try{if(STORE.last&&STORE.proj[STORE.last])p=loadProject(STORE.last);if(!p&&STORE.idx.length)p=loadProject(STORE.idx[0])}catch(_){}if(!p)p=makeSample();openProject(p);setTab('design');requestAnimationFrame(fit)});
+bootStore().then(()=>{let p=null;try{if(STORE.last&&STORE.proj[STORE.last])p=loadProject(STORE.last);if(!p&&STORE.idx.length)p=loadProject(STORE.idx[0])}catch(_){}if(!p)p=makeSample();openProject(p);setTab('projects');requestAnimationFrame(fit)});
 })();
 
 </script>
