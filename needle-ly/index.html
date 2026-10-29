@@ -107,6 +107,7 @@ input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--line);
 /* export */
 #exportStage{display:flex;flex-direction:column}
 #exportStage .pgwrap{flex:1;min-height:0;overflow:auto;padding:14px;display:grid;place-items:start center}
+#pg[hidden],#pgScroll[hidden]{display:none}#pgScroll{display:flex;flex-direction:column;gap:18px;width:100%;max-width:860px}.pgbox{position:relative;width:100%;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.25)}.pgbox canvas{position:absolute;inset:0;width:100%;height:100%}
 #pg{width:100%;max-width:860px;height:auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.25);display:block}
 .pgnav{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
 /* projects */
@@ -1133,9 +1134,19 @@ function renderPageTo(canvas,d,i,total,B,craft){return withSpec(craft||craftNow(
 function renderPageTo0(canvas,d,i,total,B){const{W,H}=pageDims();canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
   if(d.t==='cover')drawCover(ctx,W,H,i+1,total);else if(d.t==='mat')drawMat(ctx,W,H,i+1,total);else if(d.t==='guide')drawGuide(ctx,W,H,i+1,total);else if(d.t==='key')drawKey(ctx,W,H,i+1,total,d);else if(d.t==='map')drawMap(ctx,W,H,i+1,total,B);else drawChartPage(ctx,W,H,i+1,total,d,B)}
 let EB=null;
-function renderPageOnly(){if(!P)return;EB=buildPages();EO.page=clamp(EO.page,0,EB.pg.length-1);renderPageTo($('#pg'),EB.pg[EO.page],EO.page,EB.pg.length,EB);
-  $('#pgnav').innerHTML=`<button class="btn sm" data-a="x:prev" ${EO.page===0?'disabled':''}>Previous</button><select id="pgSel" data-k="x:page" aria-label="Page" style="width:auto;max-width:60%">${EB.pg.map((p,i)=>`<option value="${i}" ${i===EO.page?'selected':''}>${i+1}. ${esc(p.label)}</option>`).join('')}</select><button class="btn sm" data-a="x:next" ${EO.page>=EB.pg.length-1?'disabled':''}>Next</button><span class="small mute mono">${EB.pg.length} pages · ${EB.cols} × ${EB.rows} chart sheets</span>`;
-  $('#pgnav').onclick=e=>{const b=e.target.closest('[data-a]');if(b)EXP[b.dataset.a.slice(2)](b)};$('#pgSel').oninput=e=>{EO.page=+e.target.value;renderPageOnly()}}
+let PGOB=null;
+function goPage(i){const box=$('#pgScroll');i=clamp(i,0,EB.pg.length-1);EO.page=i;const s=$('#pgSel');if(s)s.value=i;if(box&&box.children[i])box.children[i].scrollIntoView({behavior:'smooth',block:'start'})}
+function renderPageOnly(){if(!P)return;EB=buildPages();EO.page=clamp(EO.page,0,EB.pg.length-1);const sc=EO.view!=='single',wrap=$('#exportStage .pgwrap'),st=wrap.scrollTop;
+  $('#pg').hidden=sc;let box=$('#pgScroll');if(!box){box=document.createElement('div');box.id='pgScroll';wrap.appendChild(box);
+    let tick=0;wrap.addEventListener('scroll',()=>{if(tick||EO.view==='single')return;tick=requestAnimationFrame(()=>{tick=0;const top=wrap.getBoundingClientRect().top+90;let cur=0;[...box.children].forEach((c,i)=>{if(c.getBoundingClientRect().bottom>top&&!cur&&i>=0)cur=i+1});const i=Math.max(0,cur-1);if(i!==EO.page){EO.page=i;const s=$('#pgSel');if(s)s.value=i}})})}
+  box.hidden=!sc;if(PGOB){PGOB.disconnect();PGOB=null}
+  if(sc){const{W,H}=pageDims();box.innerHTML=EB.pg.map((d,i)=>`<div class="pgbox" data-i="${i}" style="aspect-ratio:${W}/${H}"><canvas width="1" height="1" aria-label="Page ${i+1}: ${esc(d.label)}"></canvas></div>`).join('');wrap.scrollTop=st;
+    PGOB=new IntersectionObserver(es=>es.forEach(en=>{const el=en.target,i=+el.dataset.i,cv=el.firstChild;
+      if(en.isIntersecting){if(!cv.dataset.r){renderPageTo(cv,EB.pg[i],i,EB.pg.length,EB);cv.dataset.r='1'}}else if(cv.dataset.r){cv.width=1;cv.height=1;delete cv.dataset.r}}),{root:wrap,rootMargin:'600px 0px'});
+    box.querySelectorAll('.pgbox').forEach(b=>PGOB.observe(b))}
+  else renderPageTo($('#pg'),EB.pg[EO.page],EO.page,EB.pg.length,EB);
+  $('#pgnav').innerHTML=`<div class="seg"><button class="btn sm" data-a="x:view" data-v="scroll" aria-pressed="${sc}">Scroll all pages</button><button class="btn sm" data-a="x:view" data-v="single" aria-pressed="${!sc}">One page at a time</button></div>${sc?'':`<button class="btn sm" data-a="x:prev" ${EO.page===0?'disabled':''}>Previous</button>`}<select id="pgSel" data-k="x:page" aria-label="${sc?'Jump to page':'Page'}" style="width:auto;max-width:60%">${EB.pg.map((d,i)=>`<option value="${i}" ${i===EO.page?'selected':''}>${i+1}. ${esc(d.label)}</option>`).join('')}</select>${sc?'':`<button class="btn sm" data-a="x:next" ${EO.page>=EB.pg.length-1?'disabled':''}>Next</button>`}<span class="small mute mono">${EB.pg.length} pages · ${EB.cols} × ${EB.rows} chart sheets</span>`;
+  $('#pgnav').onclick=e=>{const b=e.target.closest('[data-a]');if(b)EXP[b.dataset.a.slice(2)](b)};$('#pgSel').oninput=e=>{if(sc)goPage(+e.target.value);else{EO.page=+e.target.value;renderPageOnly()}}}
 function renderExport(){renderSide();renderPageOnly()}
 function sideExport(){const m=P.meta,seg=(a,cur,items)=>`<div class="seg">${items.map(([k,l])=>`<button data-a="x:${a}" data-v="${k}" aria-pressed="${String(cur)===String(k)}">${l}</button>`).join('')}</div>`;
   const cr=craftNow();
@@ -1167,7 +1178,7 @@ function makePDF(jp,W,H,emb){const parts=[],offs=[];let len=0;const enc=new Text
   const total=3+n*3+(emb?1:0),xr=len;push(`xref\n0 ${total}\n0000000000 65535 f \n`);for(let i=1;i<total;i++)push(String(offs[i]).padStart(10,'0')+' 00000 n \n');
   push(`trailer\n<</Size ${total}/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF`);const out=new Uint8Array(len);let p=0;parts.forEach(b=>{out.set(b,p);p+=b.length});return out}
 const EXP={
-  craft(t){EO.craft=t.dataset.v;EO.page=0;renderExport()},paper(t){EO.paper=t.dataset.v;EO.page=0;renderExport()},cell(t){EO.cell=+t.dataset.v;EO.page=0;renderExport()},style(t){EO.style=t.dataset.v;renderExport()},
+  view(t){EO.view=t.dataset.v;if(EO.view==='single'){const w=$('#exportStage .pgwrap');if(w)w.scrollTop=0}renderPageOnly()},craft(t){EO.craft=t.dataset.v;EO.page=0;renderExport()},paper(t){EO.paper=t.dataset.v;EO.page=0;renderExport()},cell(t){EO.cell=+t.dataset.v;EO.page=0;renderExport()},style(t){EO.style=t.dataset.v;renderExport()},
   prev(){EO.page--;renderPageOnly()},next(){EO.page++;renderPageOnly()},
   logo(){$('#fLogo').value='';$('#fLogo').click()},rmlogo(){P.meta.logo=null;SHOP.logo=null;saveShop();scheduleSave();renderExport()},
   async pdfboth(){await EXP.pdf({dataset:{craft:'needle'}});await EXP.pdf({dataset:{craft:'cross'}})},
